@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/daily/view/daily_snapshot_screen.dart';
 import '../features/dashboard/view/dashboard_screen.dart';
 import '../features/history/view/history_screen.dart';
 import '../features/register/view/register_holding_screen.dart';
@@ -18,6 +19,7 @@ class _AppShellState extends State<AppShell> {
     DashboardScreen(),
     RegisterHoldingScreen(),
     HistoryScreen(),
+    DailySnapshotScreen(),
   ];
 
   @override
@@ -46,6 +48,11 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.history),
             selectedIcon: Icon(Icons.history),
             label: '履歴',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: '日次記録',
           ),
         ],
       ),

@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/models/crypto_asset.dart';
+import '../../../data/models/daily_snapshot.dart';
 import '../../../data/models/holding_record.dart';
 import '../../../data/models/market_rates.dart';
 import '../../../data/models/rebalance_snapshot.dart';
 import '../../../data/models/storage_location.dart';
+import '../../../data/repositories/daily_snapshot_repository.dart';
 import '../../../data/repositories/holding_repository.dart';
 import '../../../data/repositories/rate_repository.dart';
 import '../../../data/services/holding_aggregator.dart';
@@ -124,14 +126,22 @@ class DashboardViewModel extends AsyncNotifier<DashboardData> {
   Future<DashboardData> _refreshRates(DashboardData current) async {
     try {
       final rates = await ref.read(rateRepositoryProvider).refresh();
+      final rebalance = RebalanceCalculator.calculate(
+        holdings: current.totals,
+        rates: rates,
+        nxHoldings:
+            current.latestByLocation[StorageLocation.nx]?.amounts ?? const {},
+      );
+      await ref.read(dailySnapshotRepositoryProvider).saveIfAbsent(
+            DailySnapshot.fromRebalance(
+              recordedAt: DateTime.now(),
+              rebalance: rebalance,
+            ),
+          );
+      ref.invalidate(dailySnapshotsProvider);
       return current.copyWith(
         rates: rates,
-        rebalance: RebalanceCalculator.calculate(
-          holdings: current.totals,
-          rates: rates,
-          nxHoldings:
-              current.latestByLocation[StorageLocation.nx]?.amounts ?? const {},
-        ),
+        rebalance: rebalance,
         isRefreshingRates: false,
         clearRateError: true,
       );

@@ -1,8 +1,10 @@
 import 'package:cryptrebalance/core/utils/formatters.dart';
 import 'package:cryptrebalance/data/models/crypto_asset.dart';
+import 'package:cryptrebalance/data/models/daily_snapshot.dart';
 import 'package:cryptrebalance/data/models/holding_record.dart';
 import 'package:cryptrebalance/data/models/market_rates.dart';
 import 'package:cryptrebalance/data/models/storage_location.dart';
+import 'package:cryptrebalance/data/repositories/daily_snapshot_repository.dart';
 import 'package:cryptrebalance/data/repositories/holding_repository.dart';
 import 'package:cryptrebalance/data/repositories/rate_repository.dart';
 import 'package:cryptrebalance/features/dashboard/view/dashboard_screen.dart';
@@ -36,6 +38,17 @@ class _MemoryHoldingRepository implements HoldingRepository {
     _records.add(saved);
     return saved;
   }
+}
+
+class _FakeDailySnapshotRepository implements DailySnapshotRepository {
+  @override
+  Future<List<DailySnapshot>> getAll() async => [];
+
+  @override
+  Future<bool> saveIfAbsent(DailySnapshot snapshot) async => true;
+
+  @override
+  Future<bool> deleteByDay(String dayKey) async => false;
 }
 
 class _FakeRateRepository implements RateRepository {
@@ -93,6 +106,9 @@ void main() {
             _MemoryHoldingRepository(holdings),
           ),
           rateRepositoryProvider.overrideWithValue(rateRepository),
+          dailySnapshotRepositoryProvider.overrideWithValue(
+            _FakeDailySnapshotRepository(),
+          ),
         ],
         child: const MaterialApp(home: DashboardScreen()),
       ),
