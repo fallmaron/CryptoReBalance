@@ -82,7 +82,7 @@ void main() {
     ];
     final rateRepository = _FakeRateRepository(rates);
 
-    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -104,6 +104,11 @@ void main() {
     expect(find.text('1 BTC'), findsOneWidget);
     expect(find.text('HYPE/BTC'), findsOneWidget);
     expect(find.text('0.0005'), findsOneWidget);
+    expect(find.text('目標配分'), findsOneWidget);
+    expect(find.text('100.0%'), findsWidgets);
+    expect(find.text('LE'), findsOneWidget);
+    expect(find.text('TR'), findsOneWidget);
+    expect(find.text('RK'), findsOneWidget);
     expect(find.textContaining('不足（購入）'), findsWidgets);
     expect(find.textContaining('過剰（売却）'), findsOneWidget);
     expect(find.text('NX'), findsOneWidget);

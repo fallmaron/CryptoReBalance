@@ -4,9 +4,12 @@ import '../../data/models/crypto_asset.dart';
 
 abstract final class Formatters {
   static final DateFormat dateTime = DateFormat('yyyy/MM/dd HH:mm:ss');
+  static final DateFormat dateTimeShort = DateFormat('MM/dd HH:mm:ss');
   static final NumberFormat _usdt = NumberFormat('#,##0.00', 'en_US');
 
   static String dateTimeText(DateTime value) => dateTime.format(value);
+
+  static String dateTimeShortText(DateTime value) => dateTimeShort.format(value);
 
   static String usdt(double value, {bool signed = false}) {
     final absText = _usdt.format(value.abs());

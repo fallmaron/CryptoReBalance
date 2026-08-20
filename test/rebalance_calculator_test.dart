@@ -39,11 +39,13 @@ void main() {
 
     final btc = snapshot.lineOf(CryptoAsset.btc);
     expect(btc.targetUsdt, 70000);
+    expect(btc.targetWeight, closeTo(0.70, 0.0000001));
     expect(btc.diffAmount, closeTo(-0.3, 0.0000001));
     expect(btc.needsSell, isTrue);
 
     final hype = snapshot.lineOf(CryptoAsset.hype);
     expect(hype.targetUsdt, 15000);
+    expect(hype.targetWeight, closeTo(0.15, 0.0000001));
     expect(hype.targetAmount, closeTo(300, 0.0000001));
     expect(hype.needsBuy, isTrue);
 
@@ -75,6 +77,36 @@ void main() {
     expect(snapshot.nxTotalUsdt, 50000);
     expect(snapshot.lineOf(CryptoAsset.nexo).targetUsdt, 5500);
     expect(snapshot.lineOf(CryptoAsset.usdt).targetUsdt, 9500);
+  });
+
+  test('moves HYPE cut from 15% onto BTC when HYPE rate is 100', () {
+    final highHypeRates = MarketRates(
+      fetchedAt: DateTime(2026, 8, 20, 11),
+      pricesUsdt: const {
+        CryptoAsset.btc: 100000,
+        CryptoAsset.hype: 100,
+        CryptoAsset.nexo: 1,
+        CryptoAsset.usdt: 1,
+      },
+    );
+    final snapshot = RebalanceCalculator.calculate(
+      holdings: const {
+        CryptoAsset.btc: 1,
+        CryptoAsset.hype: 0,
+        CryptoAsset.nexo: 0,
+        CryptoAsset.usdt: 0,
+      },
+      nxHoldings: const {
+        CryptoAsset.btc: 1,
+      },
+      rates: highHypeRates,
+    );
+
+    expect(snapshot.lineOf(CryptoAsset.hype).targetWeight, closeTo(0.10, 0.0000001));
+    expect(snapshot.lineOf(CryptoAsset.btc).targetWeight, closeTo(0.75, 0.0000001));
+    expect(snapshot.lineOf(CryptoAsset.hype).targetUsdt, 10000);
+    expect(snapshot.lineOf(CryptoAsset.btc).targetUsdt, 75000);
+    expect(snapshot.usdtNexoTargetWeight, 0.15);
   });
 
   test('returns zero weights when there are no holdings', () {

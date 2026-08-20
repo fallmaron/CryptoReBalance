@@ -1,5 +1,6 @@
 import 'package:cryptrebalance/data/models/crypto_asset.dart';
 import 'package:cryptrebalance/data/models/holding_record.dart';
+import 'package:cryptrebalance/data/models/market_rates.dart';
 import 'package:cryptrebalance/data/models/storage_location.dart';
 import 'package:cryptrebalance/data/services/holding_aggregator.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -68,5 +69,46 @@ void main() {
     expect(totals[CryptoAsset.btc], 0.75);
     expect(totals[CryptoAsset.hype], 8);
     expect(totals[CryptoAsset.usdt], 100);
+  });
+
+  test('calculates location share from USDT value', () {
+    final rates = MarketRates(
+      fetchedAt: DateTime(2026, 8, 20),
+      pricesUsdt: const {
+        CryptoAsset.btc: 100000,
+        CryptoAsset.hype: 50,
+        CryptoAsset.nexo: 1,
+        CryptoAsset.usdt: 1,
+      },
+    );
+    final nx = record(
+      location: StorageLocation.nx,
+      recordedAt: DateTime(2026, 8, 20),
+      btc: 0.5,
+    );
+    final le = record(
+      location: StorageLocation.le,
+      recordedAt: DateTime(2026, 8, 20),
+      usdt: 50000,
+    );
+
+    expect(HoldingAggregator.usdtValue(nx, rates), 50000);
+    expect(HoldingAggregator.usdtValue(le, rates), 50000);
+    expect(
+      HoldingAggregator.locationShare(
+        record: nx,
+        rates: rates,
+        totalUsdt: 100000,
+      ),
+      0.5,
+    );
+    expect(
+      HoldingAggregator.locationShare(
+        record: null,
+        rates: rates,
+        totalUsdt: 100000,
+      ),
+      0,
+    );
   });
 }

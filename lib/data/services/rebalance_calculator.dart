@@ -2,6 +2,7 @@ import '../../core/constants/app_constants.dart';
 import '../models/crypto_asset.dart';
 import '../models/market_rates.dart';
 import '../models/rebalance_snapshot.dart';
+import 'target_allocation.dart';
 
 abstract final class RebalanceCalculator {
   static RebalanceSnapshot calculate({
@@ -26,6 +27,7 @@ abstract final class RebalanceCalculator {
     final targetUsdtByAsset = _targetUsdt(
       totalUsdt: totalUsdt,
       nxTotalUsdt: nxTotalUsdt,
+      hypeUsdtRate: rates.priceOf(CryptoAsset.hype),
     );
 
     final lines = <AssetRebalance>[];
@@ -72,13 +74,15 @@ abstract final class RebalanceCalculator {
   static Map<CryptoAsset, double> _targetUsdt({
     required double totalUsdt,
     required double nxTotalUsdt,
+    required double hypeUsdtRate,
   }) {
+    final hypeWeight = TargetAllocation.hypeWeight(hypeUsdtRate);
+    final btcWeight = TargetAllocation.btcWeight(hypeWeight);
     final nexoTarget = nxTotalUsdt * AppConstants.nexoShareOfNx;
     final usdtNexoTarget = totalUsdt * AppConstants.usdtNexoWeight;
     return {
-      CryptoAsset.btc: totalUsdt * AppConstants.targetWeights[CryptoAsset.btc]!,
-      CryptoAsset.hype:
-          totalUsdt * AppConstants.targetWeights[CryptoAsset.hype]!,
+      CryptoAsset.btc: totalUsdt * btcWeight,
+      CryptoAsset.hype: totalUsdt * hypeWeight,
       CryptoAsset.nexo: nexoTarget,
       CryptoAsset.usdt: usdtNexoTarget - nexoTarget,
     };

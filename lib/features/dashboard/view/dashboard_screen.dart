@@ -6,7 +6,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/crypto_asset.dart';
 import '../../../data/models/holding_record.dart';
+import '../../../data/models/market_rates.dart';
+import '../../../data/models/rebalance_snapshot.dart';
 import '../../../data/models/storage_location.dart';
+import '../../../data/services/holding_aggregator.dart';
+import '../../../data/services/target_allocation.dart';
 import '../viewmodel/dashboard_viewmodel.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -67,7 +71,9 @@ class _DashboardBody extends StatelessWidget {
         const SizedBox(height: 12),
         _RebalanceCard(data: data),
         const SizedBox(height: 12),
-        _LocationHoldingsCard(latestByLocation: data.latestByLocation),
+        _LocationHoldingsCard(data: data),
+        const SizedBox(height: 12),
+        _TargetAllocationCard(data: data),
       ],
     );
   }
@@ -107,15 +113,6 @@ class _TotalAssetCard extends StatelessWidget {
               color: AppColors.btc,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '目標配分  BTC 70% / HYPE 15% / USDT+NEXO 15%\n'
-            'NEXO は NX 総資産の 11%',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-            ),
-          ),
         ],
       ),
     );
@@ -152,22 +149,7 @@ class _RatesCard extends StatelessWidget {
                     for (final asset in [
                       CryptoAsset.btc,
                       CryptoAsset.hype,
-                    ])
-                      Expanded(
-                        child: _RateTile(
-                          label: asset.symbol,
-                          color: AppColors.forAsset(asset),
-                          value: Formatters.usdt(data.rates!.priceOf(asset)),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    for (final asset in [
                       CryptoAsset.nexo,
-                      CryptoAsset.usdt,
                     ])
                       Expanded(
                         child: _RateTile(
@@ -228,9 +210,10 @@ class _AllocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final snapshot = data.rebalance;
     return _SectionCard(
       title: '保有バランス',
-      child: data.rebalance == null
+      child: snapshot == null
           ? const Text(
               'レート取得後に現在比率と目標比率を表示します',
               style: TextStyle(color: AppColors.textSecondary),
@@ -238,34 +221,74 @@ class _AllocationCard extends StatelessWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final line in data.rebalance!.lines) ...[
-                  _AllocationRow(
-                    symbol: line.asset.symbol,
-                    color: AppColors.forAsset(line.asset),
-                    current: line.currentWeight,
-                    target: line.targetWeight,
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowHeight: 36,
+                    dataRowMinHeight: 36,
+                    dataRowMaxHeight: 42,
+                    columnSpacing: 14,
+                    horizontalMargin: 8,
+                    headingTextStyle: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                    columns: const [
+                      DataColumn(label: Text('')),
+                      DataColumn(label: Text('現在量'), numeric: true),
+                      DataColumn(label: Text('USDT建'), numeric: true),
+                      DataColumn(label: Text('目標量'), numeric: true),
+                      DataColumn(label: Text('現在比'), numeric: true),
+                      DataColumn(label: Text('目標比'), numeric: true),
+                    ],
+                    rows: [
+                      _assetRow(snapshot.lineOf(CryptoAsset.btc)),
+                      _assetRow(snapshot.lineOf(CryptoAsset.hype)),
+                      _summaryRow(
+                        label: 'UT+NE',
+                        color: AppColors.usdt,
+                        currentAmount: Formatters.usdt(
+                          snapshot.lineOf(CryptoAsset.usdt).currentUsdt +
+                              snapshot.lineOf(CryptoAsset.nexo).currentUsdt,
+                        ),
+                        currentAmountUsdt: Formatters.usdt(
+                          snapshot.lineOf(CryptoAsset.usdt).currentUsdt +
+                              snapshot.lineOf(CryptoAsset.nexo).currentUsdt,
+                        ),
+                        targetAmount: Formatters.usdt(
+                          snapshot.lineOf(CryptoAsset.usdt).targetUsdt +
+                              snapshot.lineOf(CryptoAsset.nexo).targetUsdt,
+                        ),
+                        currentWeight: snapshot.usdtNexoCurrentWeight,
+                        targetWeight: snapshot.usdtNexoTargetWeight,
+                      ),
+                      _assetRow(snapshot.lineOf(CryptoAsset.usdt)),
+                      _assetRow(snapshot.lineOf(CryptoAsset.nexo)),
+                      _summaryRow(
+                        label: 'NE/NX',
+                        color: AppColors.nexo,
+                        currentAmount: Formatters.amount(
+                          CryptoAsset.nexo,
+                          snapshot.lineOf(CryptoAsset.nexo).currentAmount,
+                        ),
+                        currentAmountUsdt: Formatters.usdt(
+                          snapshot.lineOf(CryptoAsset.nexo).currentUsdt,
+                        ),
+                        targetAmount: Formatters.amount(
+                          CryptoAsset.nexo,
+                          snapshot.lineOf(CryptoAsset.nexo).targetAmount,
+                        ),
+                        currentWeight: snapshot.nexoShareOfNxCurrent,
+                        targetWeight: snapshot.nexoShareOfNxTarget,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                ],
-                _AllocationRow(
-                  symbol: 'USDT+NEXO',
-                  color: AppColors.usdt,
-                  current: data.rebalance!.usdtNexoCurrentWeight,
-                  target: data.rebalance!.usdtNexoTargetWeight,
-                  labelWidth: 92,
-                ),
-                const SizedBox(height: 10),
-                _AllocationRow(
-                  symbol: 'NEXO/NX',
-                  color: AppColors.nexo,
-                  current: data.rebalance!.nexoShareOfNxCurrent,
-                  target: data.rebalance!.nexoShareOfNxTarget,
-                  labelWidth: 92,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'NX総資産 ${Formatters.usdt(data.rebalance!.nxTotalUsdt)} USDT の '
-                  '${Formatters.percent(data.rebalance!.nexoShareOfNxTarget)} が NEXO 目標',
+                  'NX総資産 ${Formatters.usdt(snapshot.nxTotalUsdt)} USDT の '
+                  '${Formatters.percent(snapshot.nexoShareOfNxTarget)} が NEXO 目標',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -275,65 +298,42 @@ class _AllocationCard extends StatelessWidget {
             ),
     );
   }
-}
 
-class _AllocationRow extends StatelessWidget {
-  const _AllocationRow({
-    required this.symbol,
-    required this.color,
-    required this.current,
-    required this.target,
-    this.labelWidth = 52,
-  });
+  static DataRow _assetRow(AssetRebalance line) {
+    return _summaryRow(
+      label: line.asset.symbol,
+      color: AppColors.forAsset(line.asset),
+      currentAmount: Formatters.amount(line.asset, line.currentAmount),
+      currentAmountUsdt: Formatters.usdt(line.currentUsdt),
+      targetAmount: Formatters.amount(line.asset, line.targetAmount),
+      currentWeight: line.currentWeight,
+      targetWeight: line.targetWeight,
+    );
+  }
 
-  final String symbol;
-  final Color color;
-  final double current;
-  final double target;
-  final double labelWidth;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            SizedBox(
-              width: labelWidth,
-              child: Text(
-                symbol,
-                style: TextStyle(color: color, fontWeight: FontWeight.w700),
-              ),
-            ),
-            Text(
-              '${Formatters.percent(current)}  /  目標 ${Formatters.percent(target)}',
-              style: const TextStyle(fontSize: 13),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            height: 10,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                LinearProgressIndicator(
-                  value: target.clamp(0, 1),
-                  backgroundColor: AppColors.surface,
-                  color: color.withValues(alpha: 0.28),
-                ),
-                LinearProgressIndicator(
-                  value: current.clamp(0, 1),
-                  backgroundColor: Colors.transparent,
-                  color: color,
-                ),
-              ],
-            ),
+  static DataRow _summaryRow({
+    required String label,
+    required Color color,
+    required String currentAmount,
+    required String currentAmountUsdt,
+    required String targetAmount,
+    required double currentWeight,
+    required double targetWeight,
+  }) {
+    const cellStyle = TextStyle(fontWeight: FontWeight.w600, fontSize: 11);
+    return DataRow(
+      cells: [
+        DataCell(
+          Text(
+            label,
+            style: TextStyle(color: color, fontWeight: FontWeight.w800),
           ),
         ),
+        DataCell(Text(currentAmount, style: cellStyle)),
+        DataCell(Text(currentAmountUsdt, style: cellStyle)),
+        DataCell(Text(targetAmount, style: cellStyle)),
+        DataCell(Text(Formatters.percent(currentWeight), style: cellStyle)),
+        DataCell(Text(Formatters.percent(targetWeight), style: cellStyle)),
       ],
     );
   }
@@ -353,221 +353,238 @@ class _RebalanceCard extends StatelessWidget {
               '直近保有量とレートから、目標保有量との差分を計算します',
               style: TextStyle(color: AppColors.textSecondary),
             )
-          : Column(
-              children: [
-                for (final line in data.rebalance!.lines) ...[
-                  _DiffRow(
-                    asset: line.asset.symbol,
-                    color: AppColors.forAsset(line.asset),
-                    current: Formatters.amount(line.asset, line.currentAmount),
-                    target: Formatters.amount(line.asset, line.targetAmount),
-                    diffAmount: Formatters.amount(
-                      line.asset,
-                      line.diffAmount,
-                      signed: true,
-                    ),
-                    diffUsdt: Formatters.usdt(line.diffUsdt, signed: true),
-                    isBuy: line.needsBuy,
-                    isSell: line.needsSell,
-                  ),
-                  if (line != data.rebalance!.lines.last)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Divider(height: 1),
-                    ),
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowHeight: 36,
+                dataRowMinHeight: 36,
+                dataRowMaxHeight: 42,
+                columnSpacing: 14,
+                horizontalMargin: 8,
+                headingTextStyle: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+                columns: const [
+                  DataColumn(label: Text('')),
+                  DataColumn(label: Text('差分'), numeric: true),
+                  DataColumn(label: Text('USDT換算'), numeric: true),
+                  DataColumn(label: Text('状態')),
                 ],
-              ],
+                rows: [
+                  for (final asset in [
+                    CryptoAsset.btc,
+                    CryptoAsset.hype,
+                    CryptoAsset.usdt,
+                    CryptoAsset.nexo,
+                  ])
+                    _rebalanceRow(data.rebalance!.lineOf(asset)),
+                ],
+              ),
             ),
     );
   }
-}
 
-class _DiffRow extends StatelessWidget {
-  const _DiffRow({
-    required this.asset,
-    required this.color,
-    required this.current,
-    required this.target,
-    required this.diffAmount,
-    required this.diffUsdt,
-    required this.isBuy,
-    required this.isSell,
-  });
-
-  final String asset;
-  final Color color;
-  final String current;
-  final String target;
-  final String diffAmount;
-  final String diffUsdt;
-  final bool isBuy;
-  final bool isSell;
-
-  @override
-  Widget build(BuildContext context) {
-    final actionColor = isBuy
+  DataRow _rebalanceRow(AssetRebalance line) {
+    final actionColor = line.needsBuy
         ? AppColors.buy
-        : isSell
+        : line.needsSell
         ? AppColors.sell
         : AppColors.textSecondary;
-    final actionLabel = isBuy
+    final actionLabel = line.needsBuy
         ? '不足（購入）'
-        : isSell
+        : line.needsSell
         ? '過剰（売却）'
         : '目標一致';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              asset,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-              ),
+    const cellStyle = TextStyle(fontWeight: FontWeight.w600, fontSize: 11);
+    return DataRow(
+      cells: [
+        DataCell(
+          Text(
+            line.asset.symbol,
+            style: TextStyle(
+              color: AppColors.forAsset(line.asset),
+              fontWeight: FontWeight.w800,
             ),
-            const Spacer(),
-            Text(
-              actionLabel,
-              style: TextStyle(
-                color: actionColor,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-            ),
-          ],
+          ),
         ),
-        const SizedBox(height: 8),
-        _kv('現在量', current),
-        _kv('目標量', target),
-        _kv('差分', diffAmount, valueColor: actionColor),
-        _kv('USDT換算', '$diffUsdt USDT', valueColor: actionColor),
+        DataCell(
+          Text(
+            Formatters.amount(line.asset, line.diffAmount, signed: true),
+            style: cellStyle.copyWith(color: actionColor),
+          ),
+        ),
+        DataCell(
+          Text(
+            Formatters.usdt(line.diffUsdt, signed: true),
+            style: cellStyle.copyWith(color: actionColor),
+          ),
+        ),
+        DataCell(
+          Text(
+            actionLabel,
+            style: TextStyle(
+              color: actionColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
+          ),
+        ),
       ],
-    );
-  }
-
-  Widget _kv(String label, String value, {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 88,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: valueColor ?? AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
 class _LocationHoldingsCard extends StatelessWidget {
-  const _LocationHoldingsCard({required this.latestByLocation});
+  const _LocationHoldingsCard({required this.data});
 
-  final Map<StorageLocation, HoldingRecord> latestByLocation;
+  final DashboardData data;
+
+  static const _amountColumns = [
+    CryptoAsset.btc,
+    CryptoAsset.hype,
+    CryptoAsset.usdt,
+    CryptoAsset.nexo,
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final rates = data.rates;
+    final totalUsdt = data.rebalance?.totalUsdt ?? 0;
+    const headerStyle = TextStyle(
+      color: AppColors.textSecondary,
+      fontWeight: FontWeight.w700,
+      fontSize: 11,
+    );
+    const cellStyle = TextStyle(fontWeight: FontWeight.w600, fontSize: 11);
+
     return _SectionCard(
       title: '保管場所別 直近保有',
-      child: Column(
-        children: [
-          for (final location in StorageLocation.values) ...[
-            _LocationRow(
-              location: location,
-              record: latestByLocation[location],
-            ),
-            if (location != StorageLocation.rk)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Divider(height: 1),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowHeight: 36,
+          dataRowMinHeight: 36,
+          dataRowMaxHeight: 42,
+          columnSpacing: 14,
+          horizontalMargin: 8,
+          headingTextStyle: headerStyle,
+          columns: [
+            const DataColumn(label: Text('')),
+            for (final asset in _amountColumns)
+              DataColumn(
+                label: Text(
+                  asset.symbol,
+                  style: TextStyle(color: AppColors.forAsset(asset)),
+                ),
+              ),
+            const DataColumn(label: Text('比率'), numeric: true),
+            const DataColumn(label: Text('最終更新')),
+          ],
+          rows: [
+            for (final location in StorageLocation.values)
+              _row(
+                location: location,
+                record: data.latestByLocation[location],
+                rates: rates,
+                totalUsdt: totalUsdt,
+                cellStyle: cellStyle,
               ),
           ],
-        ],
+        ),
       ),
+    );
+  }
+
+  DataRow _row({
+    required StorageLocation location,
+    required HoldingRecord? record,
+    required MarketRates? rates,
+    required double totalUsdt,
+    required TextStyle cellStyle,
+  }) {
+    final share = rates == null
+        ? null
+        : HoldingAggregator.locationShare(
+            record: record,
+            rates: rates,
+            totalUsdt: totalUsdt,
+          );
+    return DataRow(
+      cells: [
+        DataCell(
+          Text(
+            location.code,
+            style: const TextStyle(
+              color: AppColors.accent,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        for (final asset in _amountColumns)
+          DataCell(
+            Text(
+              Formatters.amount(asset, record?.amountOf(asset) ?? 0),
+              style: cellStyle.copyWith(color: AppColors.forAsset(asset)),
+            ),
+          ),
+        DataCell(
+          Text(
+            share == null ? '—' : Formatters.percent(share),
+            style: cellStyle,
+          ),
+        ),
+        DataCell(
+          Text(
+            record == null
+                ? '未登録'
+                : Formatters.dateTimeShortText(record.recordedAt),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _LocationRow extends StatelessWidget {
-  const _LocationRow({required this.location, required this.record});
+class _TargetAllocationCard extends StatelessWidget {
+  const _TargetAllocationCard({required this.data});
 
-  final StorageLocation location;
-  final HoldingRecord? record;
+  final DashboardData data;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.accentDim,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                location.code,
-                style: const TextStyle(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            const Spacer(),
-            Text(
-              record == null ? '未登録' : Formatters.dateTimeText(record!.recordedAt),
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-              ),
-            ),
-          ],
+    return _SectionCard(
+      title: '目標配分',
+      child: Text(
+        _summary(data),
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 13,
+          height: 1.5,
         ),
-        const SizedBox(height: 8),
-        if (record == null)
-          const Text(
-            '保有量がまだ登録されていません',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          )
-        else
-          Wrap(
-            spacing: 12,
-            runSpacing: 4,
-            children: [
-              for (final asset in CryptoAsset.values)
-                Text(
-                  '${asset.symbol} ${Formatters.amount(asset, record!.amountOf(asset))}',
-                  style: TextStyle(
-                    color: AppColors.forAsset(asset),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-            ],
-          ),
-      ],
+      ),
     );
+  }
+
+  static String _summary(DashboardData data) {
+    if (data.rates == null) {
+      return 'BTC 70.0〜75.0% / HYPE 10.0〜15.0% / USDT+NEXO 15.0%\n'
+          'HYPE はレート連動（50以下=15.0%、100以上=10.0%、0.1%刻み）。減った分は BTC へ。\n'
+          'NEXO は NX 総資産の 11%';
+    }
+    final hypeWeight = TargetAllocation.hypeWeight(
+      data.rates!.priceOf(CryptoAsset.hype),
+    );
+    final btcWeight = TargetAllocation.btcWeight(hypeWeight);
+    return 'BTC ${Formatters.percent(btcWeight)} / '
+        'HYPE ${Formatters.percent(hypeWeight)} / USDT+NEXO 15.0%\n'
+        'HYPE はレート連動（50以下=15.0%、100以上=10.0%、0.1%刻み）。減った分は BTC へ。\n'
+        'NEXO は NX 総資産の 11%';
   }
 }
 

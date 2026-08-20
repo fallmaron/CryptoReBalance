@@ -1,5 +1,6 @@
 import '../models/crypto_asset.dart';
 import '../models/holding_record.dart';
+import '../models/market_rates.dart';
 import '../models/storage_location.dart';
 
 abstract final class HoldingAggregator {
@@ -27,5 +28,24 @@ abstract final class HoldingAggregator {
       }
     }
     return totals;
+  }
+
+  static double usdtValue(HoldingRecord record, MarketRates rates) {
+    var total = 0.0;
+    for (final asset in CryptoAsset.values) {
+      total += record.amountOf(asset) * rates.priceOf(asset);
+    }
+    return total;
+  }
+
+  static double locationShare({
+    required HoldingRecord? record,
+    required MarketRates rates,
+    required double totalUsdt,
+  }) {
+    if (record == null || totalUsdt == 0) {
+      return 0;
+    }
+    return usdtValue(record, rates) / totalUsdt;
   }
 }
