@@ -20,9 +20,7 @@ class RegisterHoldingScreen extends ConsumerStatefulWidget {
 
 class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _btcController = TextEditingController();
-  final _hypeController = TextEditingController();
-  final _usdtController = TextEditingController();
+  late final Map<CryptoAsset, TextEditingController> _controllers;
 
   StorageLocation _location = StorageLocation.nx;
   DateTime _recordedAt = DateTime.now();
@@ -32,14 +30,17 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
   @override
   void initState() {
     super.initState();
+    _controllers = {
+      for (final asset in CryptoAsset.values) asset: TextEditingController(),
+    };
     _loadLatest();
   }
 
   @override
   void dispose() {
-    _btcController.dispose();
-    _hypeController.dispose();
-    _usdtController.dispose();
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -56,15 +57,11 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
 
   void _prefillFromLatest() {
     final record = _latest[_location];
-    _btcController.text = record == null
-        ? ''
-        : Formatters.amount(CryptoAsset.btc, record.amountOf(CryptoAsset.btc));
-    _hypeController.text = record == null
-        ? ''
-        : Formatters.amount(CryptoAsset.hype, record.amountOf(CryptoAsset.hype));
-    _usdtController.text = record == null
-        ? ''
-        : Formatters.amount(CryptoAsset.usdt, record.amountOf(CryptoAsset.usdt));
+    for (final asset in CryptoAsset.values) {
+      _controllers[asset]!.text = record == null
+          ? ''
+          : Formatters.amount(asset, record.amountOf(asset));
+    }
   }
 
   Future<void> _pickDateTime() async {
@@ -137,9 +134,8 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
         recordedAt: _recordedAt,
         location: _location,
         amounts: {
-          CryptoAsset.btc: _parseAmount(_btcController.text),
-          CryptoAsset.hype: _parseAmount(_hypeController.text),
-          CryptoAsset.usdt: _parseAmount(_usdtController.text),
+          for (final asset in CryptoAsset.values)
+            asset: _parseAmount(_controllers[asset]!.text),
         },
       );
       await ref.read(holdingRepositoryProvider).save(record);
@@ -268,27 +264,16 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            _AmountField(
-              label: 'BTC',
-              controller: _btcController,
-              color: AppColors.btc,
-              validator: _amountValidator,
-            ),
+            for (final asset in CryptoAsset.values) ...[
+              _AmountField(
+                label: asset.symbol,
+                controller: _controllers[asset]!,
+                color: AppColors.forAsset(asset),
+                validator: _amountValidator,
+              ),
+              const SizedBox(height: 12),
+            ],
             const SizedBox(height: 12),
-            _AmountField(
-              label: 'HYPE',
-              controller: _hypeController,
-              color: AppColors.hype,
-              validator: _amountValidator,
-            ),
-            const SizedBox(height: 12),
-            _AmountField(
-              label: 'USDT',
-              controller: _usdtController,
-              color: AppColors.usdt,
-              validator: _amountValidator,
-            ),
-            const SizedBox(height: 24),
             FilledButton(
               onPressed: _saving ? null : _save,
               child: Text(_saving ? '保存中...' : '履歴として保存'),

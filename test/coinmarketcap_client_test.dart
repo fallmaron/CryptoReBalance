@@ -42,6 +42,13 @@ void main() {
                   'USDT': {'price': 1.0},
                 },
               },
+              {
+                'symbol': 'NEXO',
+                'cmc_rank': 90,
+                'quote': {
+                  'USDT': {'price': 1.25},
+                },
+              },
             ],
           }),
           200,
@@ -55,6 +62,7 @@ void main() {
     expect(rates.priceOf(CryptoAsset.btc), 110000.5);
     expect(rates.priceOf(CryptoAsset.hype), 42.1);
     expect(rates.priceOf(CryptoAsset.usdt), 1.0);
+    expect(rates.priceOf(CryptoAsset.nexo), 1.25);
   });
 
   test('keeps the better ranked duplicate symbol', () async {
@@ -90,6 +98,13 @@ void main() {
                 'cmc_rank': 3,
                 'quote': {
                   'USDT': {'price': 1},
+                },
+              },
+              {
+                'symbol': 'NEXO',
+                'cmc_rank': 90,
+                'quote': {
+                  'USDT': {'price': 1.1},
                 },
               },
             ],

@@ -1,6 +1,7 @@
 enum CryptoAsset {
   btc('BTC'),
   hype('HYPE'),
+  nexo('NEXO'),
   usdt('USDT');
 
   const CryptoAsset(this.symbol);

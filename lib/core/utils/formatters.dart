@@ -26,6 +26,7 @@ abstract final class Formatters {
     final digits = switch (asset) {
       CryptoAsset.btc => 8,
       CryptoAsset.hype => 6,
+      CryptoAsset.nexo => 4,
       CryptoAsset.usdt => 4,
     };
     var text = value.abs().toStringAsFixed(digits);

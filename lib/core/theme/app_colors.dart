@@ -17,12 +17,14 @@ abstract final class AppColors {
 
   static const btc = Color(0xFFF7931A);
   static const hype = Color(0xFF2DE2C5);
+  static const nexo = Color(0xFF4B8DF8);
   static const usdt = Color(0xFF26A17B);
 
   static Color forAsset(CryptoAsset asset) {
     return switch (asset) {
       CryptoAsset.btc => btc,
       CryptoAsset.hype => hype,
+      CryptoAsset.nexo => nexo,
       CryptoAsset.usdt => usdt,
     };
   }

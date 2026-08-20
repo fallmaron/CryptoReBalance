@@ -31,11 +31,21 @@ class RebalanceSnapshot {
   const RebalanceSnapshot({
     required this.totalUsdt,
     required this.totalBtc,
+    required this.nxTotalUsdt,
+    required this.usdtNexoCurrentWeight,
+    required this.usdtNexoTargetWeight,
+    required this.nexoShareOfNxCurrent,
+    required this.nexoShareOfNxTarget,
     required this.lines,
   });
 
   final double totalUsdt;
   final double totalBtc;
+  final double nxTotalUsdt;
+  final double usdtNexoCurrentWeight;
+  final double usdtNexoTargetWeight;
+  final double nexoShareOfNxCurrent;
+  final double nexoShareOfNxTarget;
   final List<AssetRebalance> lines;
 
   AssetRebalance lineOf(CryptoAsset asset) {

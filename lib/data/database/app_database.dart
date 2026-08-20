@@ -25,7 +25,7 @@ class AppDatabase {
     final dbPath = await getDatabasesPath();
     return openDatabase(
       p.join(dbPath, 'cryptrebalance.db'),
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE holdings (
@@ -34,6 +34,7 @@ class AppDatabase {
             location TEXT NOT NULL,
             btc REAL NOT NULL,
             hype REAL NOT NULL,
+            nexo REAL NOT NULL,
             usdt REAL NOT NULL
           )
         ''');
@@ -47,9 +48,21 @@ class AppDatabase {
             fetched_at INTEGER NOT NULL,
             btc REAL NOT NULL,
             hype REAL NOT NULL,
+            nexo REAL NOT NULL,
             usdt REAL NOT NULL
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'ALTER TABLE holdings ADD COLUMN nexo REAL NOT NULL DEFAULT 0',
+          );
+          await db.execute(
+            'ALTER TABLE rate_snapshots ADD COLUMN nexo REAL NOT NULL DEFAULT 0',
+          );
+          await db.delete('rate_snapshots');
+        }
       },
     );
   }
@@ -61,7 +74,10 @@ class AppDatabase {
 
   Future<List<HoldingRecord>> getHoldings() async {
     final db = await database;
-    final rows = await db.query('holdings', orderBy: 'recorded_at DESC, id DESC');
+    final rows = await db.query(
+      'holdings',
+      orderBy: 'recorded_at DESC, id DESC',
+    );
     return rows.map(_holdingFromMap).toList();
   }
 
@@ -78,6 +94,7 @@ class AppDatabase {
         'fetched_at': rates.fetchedAt.millisecondsSinceEpoch,
         'btc': rates.priceOf(CryptoAsset.btc),
         'hype': rates.priceOf(CryptoAsset.hype),
+        'nexo': rates.priceOf(CryptoAsset.nexo),
         'usdt': rates.priceOf(CryptoAsset.usdt),
       });
     });
@@ -94,13 +111,18 @@ class AppDatabase {
       return null;
     }
     final row = rows.first;
+    final prices = {
+      CryptoAsset.btc: _asDouble(row['btc']),
+      CryptoAsset.hype: _asDouble(row['hype']),
+      CryptoAsset.nexo: _asDouble(row['nexo']),
+      CryptoAsset.usdt: _asDouble(row['usdt']),
+    };
+    if (prices.values.any((price) => price <= 0)) {
+      return null;
+    }
     return MarketRates(
       fetchedAt: DateTime.fromMillisecondsSinceEpoch(row['fetched_at']! as int),
-      pricesUsdt: {
-        CryptoAsset.btc: (row['btc']! as num).toDouble(),
-        CryptoAsset.hype: (row['hype']! as num).toDouble(),
-        CryptoAsset.usdt: (row['usdt']! as num).toDouble(),
-      },
+      pricesUsdt: prices,
     );
   }
 
@@ -111,6 +133,7 @@ class AppDatabase {
       'location': record.location.code,
       'btc': record.amountOf(CryptoAsset.btc),
       'hype': record.amountOf(CryptoAsset.hype),
+      'nexo': record.amountOf(CryptoAsset.nexo),
       'usdt': record.amountOf(CryptoAsset.usdt),
     };
   }
@@ -118,14 +141,24 @@ class AppDatabase {
   HoldingRecord _holdingFromMap(Map<String, Object?> row) {
     return HoldingRecord(
       id: row['id']! as int,
-      recordedAt: DateTime.fromMillisecondsSinceEpoch(row['recorded_at']! as int),
+      recordedAt: DateTime.fromMillisecondsSinceEpoch(
+        row['recorded_at']! as int,
+      ),
       location: StorageLocation.fromCode(row['location']! as String),
       amounts: {
-        CryptoAsset.btc: (row['btc']! as num).toDouble(),
-        CryptoAsset.hype: (row['hype']! as num).toDouble(),
-        CryptoAsset.usdt: (row['usdt']! as num).toDouble(),
+        CryptoAsset.btc: _asDouble(row['btc']),
+        CryptoAsset.hype: _asDouble(row['hype']),
+        CryptoAsset.nexo: _asDouble(row['nexo']),
+        CryptoAsset.usdt: _asDouble(row['usdt']),
       },
     );
+  }
+
+  static double _asDouble(Object? value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    return 0;
   }
 }
 

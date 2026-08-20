@@ -71,6 +71,7 @@ class DashboardViewModel extends AsyncNotifier<DashboardData> {
           : RebalanceCalculator.calculate(
               holdings: totals,
               rates: cachedRates,
+              nxHoldings: latest[StorageLocation.nx]?.amounts ?? const {},
             ),
       rateError: null,
       isRefreshingRates: cachedRates == null,
@@ -101,6 +102,7 @@ class DashboardViewModel extends AsyncNotifier<DashboardData> {
             : RebalanceCalculator.calculate(
                 holdings: totals,
                 rates: current.rates!,
+                nxHoldings: latest[StorageLocation.nx]?.amounts ?? const {},
               ),
         clearRebalance: current.rates == null,
       ),
@@ -127,6 +129,8 @@ class DashboardViewModel extends AsyncNotifier<DashboardData> {
         rebalance: RebalanceCalculator.calculate(
           holdings: current.totals,
           rates: rates,
+          nxHoldings:
+              current.latestByLocation[StorageLocation.nx]?.amounts ?? const {},
         ),
         isRefreshingRates: false,
         clearRateError: true,

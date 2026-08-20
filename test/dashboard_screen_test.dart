@@ -63,6 +63,7 @@ void main() {
       pricesUsdt: const {
         CryptoAsset.btc: 100000,
         CryptoAsset.hype: 50,
+        CryptoAsset.nexo: 1,
         CryptoAsset.usdt: 1,
       },
     );
@@ -74,6 +75,7 @@ void main() {
         amounts: const {
           CryptoAsset.btc: 1,
           CryptoAsset.hype: 0,
+          CryptoAsset.nexo: 0,
           CryptoAsset.usdt: 0,
         },
       ),

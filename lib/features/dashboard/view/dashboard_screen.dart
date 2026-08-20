@@ -109,7 +109,8 @@ class _TotalAssetCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '目標配分  BTC 70% / HYPE 15% / USDT 15%',
+            '目標配分  BTC 70% / HYPE 15% / USDT+NEXO 15%\n'
+            'NEXO は NX 総資産の 11%',
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13,
@@ -148,7 +149,26 @@ class _RatesCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    for (final asset in CryptoAsset.values)
+                    for (final asset in [
+                      CryptoAsset.btc,
+                      CryptoAsset.hype,
+                    ])
+                      Expanded(
+                        child: _RateTile(
+                          label: asset.symbol,
+                          color: AppColors.forAsset(asset),
+                          value: Formatters.usdt(data.rates!.priceOf(asset)),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    for (final asset in [
+                      CryptoAsset.nexo,
+                      CryptoAsset.usdt,
+                    ])
                       Expanded(
                         child: _RateTile(
                           label: asset.symbol,
@@ -216,6 +236,7 @@ class _AllocationCard extends StatelessWidget {
               style: TextStyle(color: AppColors.textSecondary),
             )
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final line in data.rebalance!.lines) ...[
                   _AllocationRow(
@@ -224,8 +245,32 @@ class _AllocationCard extends StatelessWidget {
                     current: line.currentWeight,
                     target: line.targetWeight,
                   ),
-                  if (line.asset != CryptoAsset.usdt) const SizedBox(height: 10),
+                  const SizedBox(height: 10),
                 ],
+                _AllocationRow(
+                  symbol: 'USDT+NEXO',
+                  color: AppColors.usdt,
+                  current: data.rebalance!.usdtNexoCurrentWeight,
+                  target: data.rebalance!.usdtNexoTargetWeight,
+                  labelWidth: 92,
+                ),
+                const SizedBox(height: 10),
+                _AllocationRow(
+                  symbol: 'NEXO/NX',
+                  color: AppColors.nexo,
+                  current: data.rebalance!.nexoShareOfNxCurrent,
+                  target: data.rebalance!.nexoShareOfNxTarget,
+                  labelWidth: 92,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'NX総資産 ${Formatters.usdt(data.rebalance!.nxTotalUsdt)} USDT の '
+                  '${Formatters.percent(data.rebalance!.nexoShareOfNxTarget)} が NEXO 目標',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
     );
@@ -238,12 +283,14 @@ class _AllocationRow extends StatelessWidget {
     required this.color,
     required this.current,
     required this.target,
+    this.labelWidth = 52,
   });
 
   final String symbol;
   final Color color;
   final double current;
   final double target;
+  final double labelWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -253,7 +300,7 @@ class _AllocationRow extends StatelessWidget {
         Row(
           children: [
             SizedBox(
-              width: 52,
+              width: labelWidth,
               child: Text(
                 symbol,
                 style: TextStyle(color: color, fontWeight: FontWeight.w700),
@@ -323,7 +370,7 @@ class _RebalanceCard extends StatelessWidget {
                     isBuy: line.needsBuy,
                     isSell: line.needsSell,
                   ),
-                  if (line.asset != CryptoAsset.usdt)
+                  if (line != data.rebalance!.lines.last)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Divider(height: 1),

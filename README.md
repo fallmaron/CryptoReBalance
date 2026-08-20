@@ -1,6 +1,6 @@
 # CryptReBalance
 
-BTC 70% / HYPE 15% / USDT 15% の保有バランスを、保管場所（NX / LE / TR / RK）ごとの履歴から管理する Android 向け Flutter アプリです。
+BTC 70% / HYPE 15% / USDT+NEXO 15% の保有バランスを、保管場所（NX / LE / TR / RK）ごとの履歴から管理する Android 向け Flutter アプリです。NEXO は NX 総資産の 11% を目標にします。
 
 ## できること
 

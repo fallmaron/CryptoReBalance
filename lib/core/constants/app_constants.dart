@@ -13,6 +13,7 @@ abstract final class AppConstants {
   static const Map<CryptoAsset, double> targetWeights = {
     CryptoAsset.btc: 0.70,
     CryptoAsset.hype: 0.15,
-    CryptoAsset.usdt: 0.15,
   };
+  static const usdtNexoWeight = 0.15;
+  static const nexoShareOfNx = 0.11;
 }
