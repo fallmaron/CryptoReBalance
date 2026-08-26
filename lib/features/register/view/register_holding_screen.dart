@@ -23,7 +23,6 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
   late final Map<CryptoAsset, TextEditingController> _controllers;
 
   StorageLocation _location = StorageLocation.nx;
-  DateTime _recordedAt = DateTime.now();
   bool _saving = false;
   Map<StorageLocation, HoldingRecord> _latest = {};
 
@@ -64,41 +63,6 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
     }
   }
 
-  Future<void> _pickDateTime() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _recordedAt,
-      firstDate: DateTime(2010),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-    );
-    if (date == null || !mounted) {
-      return;
-    }
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_recordedAt),
-    );
-    if (time == null || !mounted) {
-      return;
-    }
-    setState(() {
-      _recordedAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-        _recordedAt.second,
-      );
-    });
-  }
-
-  Future<void> _useNow() async {
-    setState(() {
-      _recordedAt = DateTime.now();
-    });
-  }
-
   double _parseAmount(String raw) {
     final text = raw.trim();
     if (text.isEmpty) {
@@ -131,7 +95,7 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
     });
     try {
       final record = HoldingRecord(
-        recordedAt: _recordedAt,
+        recordedAt: DateTime.now(),
         location: _location,
         amounts: {
           for (final asset in CryptoAsset.values)
@@ -201,66 +165,6 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
                       _prefillFromLatest();
                     },
                   ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              '記録日時',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _pickDateTime,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(Formatters.dateTimeText(_recordedAt)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: _useNow,
-                  child: const Text('現在'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text(
-                  '秒',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-                const SizedBox(width: 12),
-                DropdownButton<int>(
-                  value: _recordedAt.second,
-                  dropdownColor: AppColors.surfaceElevated,
-                  items: [
-                    for (var second = 0; second < 60; second++)
-                      DropdownMenuItem(
-                        value: second,
-                        child: Text(second.toString().padLeft(2, '0')),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value == null) {
-                      return;
-                    }
-                    setState(() {
-                      _recordedAt = DateTime(
-                        _recordedAt.year,
-                        _recordedAt.month,
-                        _recordedAt.day,
-                        _recordedAt.hour,
-                        _recordedAt.minute,
-                        value,
-                      );
-                    });
-                  },
-                ),
               ],
             ),
             const SizedBox(height: 20),
