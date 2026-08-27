@@ -9,6 +9,7 @@ import '../../../data/models/holding_record.dart';
 import '../../../data/models/market_rates.dart';
 import '../../../data/models/rebalance_snapshot.dart';
 import '../../../data/models/storage_location.dart';
+import '../../../data/repositories/rebalance_profit_repository.dart';
 import '../../../data/services/holding_aggregator.dart';
 import '../../../data/services/target_allocation.dart';
 import '../viewmodel/dashboard_viewmodel.dart';
@@ -65,6 +66,8 @@ class _DashboardBody extends StatelessWidget {
         ],
         _TotalAssetCard(data: data),
         const SizedBox(height: 12),
+        const _RebalanceProfitCard(),
+        const SizedBox(height: 12),
         _RatesCard(data: data),
         const SizedBox(height: 12),
         _AllocationCard(data: data),
@@ -114,6 +117,91 @@ class _TotalAssetCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RebalanceProfitCard extends ConsumerWidget {
+  const _RebalanceProfitCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncProfits = ref.watch(rebalanceProfitsProvider);
+    return _SectionCard(
+      title: 'リバランス収益',
+      child: asyncProfits.when(
+        loading: () => const LinearProgressIndicator(minHeight: 2),
+        error: (error, _) => Text(
+          error.toString(),
+          style: const TextStyle(color: AppColors.sell, fontSize: 13),
+        ),
+        data: (profits) {
+          if (profits.isEmpty) {
+            return const Text(
+              '保管場所ごとに、リバランス登録時に直近リバランスの実施有無の差を記録します',
+              style: TextStyle(color: AppColors.textSecondary),
+            );
+          }
+          final latest = profits.first;
+          final total = profits.fold<double>(
+            0,
+            (sum, item) => sum + item.profitUsdt,
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '累計  ${Formatters.usdt(total, signed: true)} USDT',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: total >= 0 ? AppColors.buy : AppColors.sell,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '直近  ${latest.location.code}  ${Formatters.usdt(latest.profitUsdt, signed: true)} USDT',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                Formatters.dateTimeText(latest.recordedAt),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final profit in profits.take(5))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${profit.location.code}  ${Formatters.dateTimeShortText(profit.recordedAt)}',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${Formatters.usdt(profit.profitUsdt, signed: true)} USDT',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: profit.profitUsdt >= 0
+                              ? AppColors.buy
+                              : AppColors.sell,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

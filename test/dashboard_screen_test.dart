@@ -3,10 +3,12 @@ import 'package:cryptrebalance/data/models/crypto_asset.dart';
 import 'package:cryptrebalance/data/models/daily_snapshot.dart';
 import 'package:cryptrebalance/data/models/holding_record.dart';
 import 'package:cryptrebalance/data/models/market_rates.dart';
+import 'package:cryptrebalance/data/models/rebalance_profit.dart';
 import 'package:cryptrebalance/data/models/storage_location.dart';
 import 'package:cryptrebalance/data/repositories/daily_snapshot_repository.dart';
 import 'package:cryptrebalance/data/repositories/holding_repository.dart';
 import 'package:cryptrebalance/data/repositories/rate_repository.dart';
+import 'package:cryptrebalance/data/repositories/rebalance_profit_repository.dart';
 import 'package:cryptrebalance/features/dashboard/view/dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -38,6 +40,22 @@ class _MemoryHoldingRepository implements HoldingRepository {
     _records.add(saved);
     return saved;
   }
+
+  @override
+  Future<void> deleteAll() async {
+    _records.clear();
+  }
+}
+
+class _FakeRebalanceProfitRepository implements RebalanceProfitRepository {
+  @override
+  Future<List<RebalanceProfit>> getAll() async => [];
+
+  @override
+  Future<bool> saveIfAbsent(RebalanceProfit profit) async => false;
+
+  @override
+  Future<void> deleteAll() async {}
 }
 
 class _FakeDailySnapshotRepository implements DailySnapshotRepository {
@@ -109,6 +127,9 @@ void main() {
           dailySnapshotRepositoryProvider.overrideWithValue(
             _FakeDailySnapshotRepository(),
           ),
+          rebalanceProfitRepositoryProvider.overrideWithValue(
+            _FakeRebalanceProfitRepository(),
+          ),
         ],
         child: const MaterialApp(home: DashboardScreen()),
       ),
@@ -116,6 +137,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('更新'), findsOneWidget);
+    expect(find.text('リバランス収益'), findsOneWidget);
     expect(find.text('100,000.00 USDT'), findsOneWidget);
     expect(find.text('1 BTC'), findsOneWidget);
     expect(find.text('HYPE/BTC'), findsOneWidget);

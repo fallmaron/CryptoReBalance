@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/crypto_asset.dart';
+import '../../../data/models/holding_entry_kind.dart';
 import '../../../data/models/holding_record.dart';
 import '../../../data/models/storage_location.dart';
 import '../../../data/repositories/holding_repository.dart';
+import '../../../data/repositories/rate_repository.dart';
+import '../../../data/repositories/rebalance_profit_repository.dart';
+import '../../../data/services/rebalance_profit_calculator.dart';
 import '../../dashboard/viewmodel/dashboard_viewmodel.dart';
 import '../../history/viewmodel/history_viewmodel.dart';
 
@@ -23,6 +27,7 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
   late final Map<CryptoAsset, TextEditingController> _controllers;
 
   StorageLocation _location = StorageLocation.nx;
+  HoldingEntryKind _kind = HoldingEntryKind.rebalance;
   bool _saving = false;
   Map<StorageLocation, HoldingRecord> _latest = {};
 
@@ -97,21 +102,21 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
       final record = HoldingRecord(
         recordedAt: DateTime.now(),
         location: _location,
+        kind: _kind,
         amounts: {
           for (final asset in CryptoAsset.values)
             asset: _parseAmount(_controllers[asset]!.text),
         },
       );
-      await ref.read(holdingRepositoryProvider).save(record);
+      final saved = await ref.read(holdingRepositoryProvider).save(record);
       await ref.read(dashboardViewModelProvider.notifier).reloadHoldings();
       ref.invalidate(historyViewModelProvider);
+      final message = await _saveProfitIfNeeded(saved);
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_location.code} の保有量を登録しました'),
-        ),
+        SnackBar(content: Text(message)),
       );
       await _loadLatest();
     } catch (error) {
@@ -128,6 +133,37 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
         });
       }
     }
+  }
+
+  Future<String> _saveProfitIfNeeded(HoldingRecord saved) async {
+    if (_kind != HoldingEntryKind.rebalance) {
+      return '${_location.code} を場所移動として登録しました';
+    }
+
+    final rates = await ref.read(rateRepositoryProvider).getCached();
+    if (rates == null) {
+      return '${_location.code} をリバランスとして登録しました。レート未取得のため収益は記録していません';
+    }
+
+    final records = await ref.read(holdingRepositoryProvider).getAll();
+    final profit = RebalanceProfitCalculator.evaluate(
+      records: records,
+      current: saved,
+      rates: rates,
+      recordedAt: saved.recordedAt,
+    );
+    if (profit == null) {
+      return '${_location.code} をリバランスとして登録しました。前回のリバランスがないため収益は未記録です';
+    }
+
+    final recorded = await ref
+        .read(rebalanceProfitRepositoryProvider)
+        .saveIfAbsent(profit);
+    ref.invalidate(rebalanceProfitsProvider);
+    if (!recorded) {
+      return '${_location.code} をリバランスとして登録しました';
+    }
+    return '${_location.code} をリバランスとして登録し、収益 ${Formatters.usdt(profit.profitUsdt, signed: true)} USDT を記録しました';
   }
 
   @override
@@ -167,6 +203,41 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
                   ),
               ],
             ),
+            const SizedBox(height: 20),
+            const Text(
+              '登録種別',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final kind in HoldingEntryKind.values)
+                  ChoiceChip(
+                    label: Text(kind.label),
+                    selected: _kind == kind,
+                    selectedColor: AppColors.accent,
+                    labelStyle: TextStyle(
+                      color: _kind == kind
+                          ? AppColors.background
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    onSelected: (_) {
+                      setState(() {
+                        _kind = kind;
+                      });
+                    },
+                  ),
+              ],
+            ),
+            if (_kind == HoldingEntryKind.rebalance) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'この保管場所について、直近のリバランスを実施した場合と実施しなかった場合の差を、現在レートで確定します。直近リバランスから今回までの場所移動による増減は除外します。',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 20),
             for (final asset in CryptoAsset.values) ...[
               _AmountField(

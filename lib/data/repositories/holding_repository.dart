@@ -10,6 +10,7 @@ abstract class HoldingRepository {
   Future<Map<StorageLocation, HoldingRecord>> getLatestByLocation();
   Future<HoldingRecord> save(HoldingRecord record);
   Future<void> delete(int id);
+  Future<void> deleteAll();
 }
 
 class SqliteHoldingRepository implements HoldingRepository {
@@ -28,12 +29,20 @@ class SqliteHoldingRepository implements HoldingRepository {
 
   @override
   Future<HoldingRecord> save(HoldingRecord record) async {
-    final id = await _db.insertHolding(record);
-    return record.copyWith(id: id);
+    final normalized = record.copyWith(
+      recordedAt: DateTime.fromMillisecondsSinceEpoch(
+        record.recordedAt.millisecondsSinceEpoch,
+      ),
+    );
+    final id = await _db.insertHolding(normalized);
+    return normalized.copyWith(id: id);
   }
 
   @override
   Future<void> delete(int id) => _db.deleteHolding(id);
+
+  @override
+  Future<void> deleteAll() => _db.deleteAllHoldings();
 }
 
 final holdingRepositoryProvider = Provider<HoldingRepository>((ref) {

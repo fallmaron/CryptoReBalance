@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/crypto_asset.dart';
 import '../../../data/models/holding_record.dart';
+import '../../../data/models/rebalance_profit.dart';
+import '../../../data/repositories/rebalance_profit_repository.dart';
 import '../../dashboard/viewmodel/dashboard_viewmodel.dart';
 import '../viewmodel/history_viewmodel.dart';
 
@@ -14,9 +16,24 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncHistory = ref.watch(historyViewModelProvider);
+    final asyncProfits = ref.watch(rebalanceProfitsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('保有履歴')),
+      appBar: AppBar(
+        title: const Text('保有履歴'),
+        actions: [
+          IconButton(
+            onPressed: asyncHistory.maybeWhen(
+              data: (records) => records.isEmpty
+                  ? null
+                  : () => _deleteAll(context, ref),
+              orElse: () => null,
+            ),
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: '全削除',
+          ),
+        ],
+      ),
       body: asyncHistory.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text(error.toString())),
@@ -29,6 +46,10 @@ class HistoryScreen extends ConsumerWidget {
               ),
             );
           }
+          final profits = asyncProfits.maybeWhen(
+            data: (items) => items,
+            orElse: () => const <RebalanceProfit>[],
+          );
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             itemCount: records.length,
@@ -58,12 +79,46 @@ class HistoryScreen extends ConsumerWidget {
                       .read(dashboardViewModelProvider.notifier)
                       .reloadHoldings();
                 },
-                child: _HistoryCard(record: record),
+                child: _HistoryCard(
+                  record: record,
+                  profit: _profitOf(record, profits),
+                ),
               );
             },
           );
         },
       ),
+    );
+  }
+
+  static RebalanceProfit? _profitOf(
+    HoldingRecord record,
+    List<RebalanceProfit> profits,
+  ) {
+    final id = record.id;
+    if (id == null) {
+      return null;
+    }
+    for (final profit in profits) {
+      if (profit.belongsTo(id)) {
+        return profit;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _deleteAll(BuildContext context, WidgetRef ref) async {
+    final confirmed = await _confirmDeleteAll(context);
+    if (!confirmed) {
+      return;
+    }
+    await ref.read(historyViewModelProvider.notifier).deleteAll();
+    await ref.read(dashboardViewModelProvider.notifier).reloadHoldings();
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('保有履歴をすべて削除しました')),
     );
   }
 
@@ -89,12 +144,62 @@ class HistoryScreen extends ConsumerWidget {
     );
     return result ?? false;
   }
+
+  Future<bool> _confirmDeleteAll(BuildContext context) async {
+    final first = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('保有履歴をすべて削除しますか？'),
+          content: const Text('すべての保有記録とリバランス収益を削除します。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('削除する'),
+            ),
+          ],
+        );
+      },
+    );
+    if (first != true || !context.mounted) {
+      return false;
+    }
+    final second = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('本当にすべて削除しますか？'),
+          content: const Text('この操作は取り消せません。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.sell),
+              child: const Text('すべて削除'),
+            ),
+          ],
+        );
+      },
+    );
+    return second ?? false;
+  }
 }
 
 class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({required this.record});
+  const _HistoryCard({
+    required this.record,
+    this.profit,
+  });
 
   final HoldingRecord record;
+  final RebalanceProfit? profit;
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +225,26 @@ class _HistoryCard extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.accent,
                       fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    record.kind.label,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
                     ),
                   ),
                 ),
@@ -156,6 +281,24 @@ class _HistoryCard extends StatelessWidget {
                   ],
                 ),
               ),
+            if (profit != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'リバランス収益  ${Formatters.usdt(profit!.profitUsdt, signed: true)} USDT',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: profit!.profitUsdt >= 0 ? AppColors.buy : AppColors.sell,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '実施 ${Formatters.usdt(profit!.withUsdt)} / 未実施 ${Formatters.usdt(profit!.withoutUsdt)}',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ],
         ),
       ),
