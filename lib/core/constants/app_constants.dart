@@ -10,5 +10,5 @@ abstract final class AppConstants {
   static const cmcMaxStart = 1000;
 
   static const usdtNexoWeight = 0.15;
-  static const nexoShareOfNx = 0.11;
+  static const nexoShareOfNx = 0.115;
 }

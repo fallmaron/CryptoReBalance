@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/external_link.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/crypto_asset.dart';
 import '../../../data/models/holding_record.dart';
@@ -240,33 +242,6 @@ class _RebalanceProfitCard extends ConsumerWidget {
                   fontSize: 12,
                 ),
               ),
-              const SizedBox(height: 12),
-              for (final profit in profits.take(5))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${profit.location.code}  ${Formatters.dateTimeShortText(profit.recordedAt)}',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${Formatters.usdt(profit.profitUsdt, signed: true)} USDT',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: profit.profitUsdt >= 0
-                              ? AppColors.buy
-                              : AppColors.sell,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
             ],
           );
         },
@@ -416,6 +391,7 @@ class _RateTile extends StatelessWidget {
         : change!.startsWith('-')
         ? AppColors.sell
         : AppColors.textSecondary;
+    final size = Theme.of(context).textTheme.bodyMedium?.fontSize;
     return Column(
       children: [
         Text(
@@ -424,14 +400,17 @@ class _RateTile extends StatelessWidget {
           style: TextStyle(
             color: color,
             fontWeight: FontWeight.w700,
-            fontSize: 11,
+            fontSize: size,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           value,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: size,
+          ),
         ),
         if (change != null) ...[
           const SizedBox(height: 2),
@@ -440,7 +419,7 @@ class _RateTile extends StatelessWidget {
             style: TextStyle(
               color: changeColor,
               fontWeight: FontWeight.w700,
-              fontSize: 12,
+              fontSize: size,
             ),
           ),
         ],
@@ -603,8 +582,8 @@ class _RebalanceCard extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 headingRowHeight: 36,
-                dataRowMinHeight: 36,
-                dataRowMaxHeight: 42,
+                dataRowMinHeight: 40,
+                dataRowMaxHeight: 48,
                 columnSpacing: 14,
                 horizontalMargin: 8,
                 headingTextStyle: const TextStyle(
@@ -617,6 +596,7 @@ class _RebalanceCard extends StatelessWidget {
                   DataColumn(label: Text('差分'), numeric: true),
                   DataColumn(label: Text('USDT換算'), numeric: true),
                   DataColumn(label: Text('状態')),
+                  DataColumn(label: Text('')),
                 ],
                 rows: [
                   for (final asset in [
@@ -625,14 +605,14 @@ class _RebalanceCard extends StatelessWidget {
                     CryptoAsset.usdt,
                     CryptoAsset.nexo,
                   ])
-                    _rebalanceRow(data.rebalance!.lineOf(asset)),
+                    _rebalanceRow(context, data.rebalance!.lineOf(asset)),
                 ],
               ),
             ),
     );
   }
 
-  DataRow _rebalanceRow(AssetRebalance line) {
+  DataRow _rebalanceRow(BuildContext context, AssetRebalance line) {
     final actionColor = line.needsBuy
         ? AppColors.buy
         : line.needsSell
@@ -643,7 +623,13 @@ class _RebalanceCard extends StatelessWidget {
         : line.needsSell
         ? '過剰（売却）'
         : '目標一致';
-    const cellStyle = TextStyle(fontWeight: FontWeight.w600, fontSize: 11);
+    const cellStyle = TextStyle(fontWeight: FontWeight.w600);
+    final copyText = Formatters.rebalanceClipboardText(
+      asset: line.asset,
+      diffAmount: line.diffAmount,
+      diffUsdt: line.diffUsdt,
+    );
+    final nexoSpotUrl = line.asset.nexoSpotUrl;
     return DataRow(
       cells: [
         DataCell(
@@ -677,7 +663,66 @@ class _RebalanceCard extends StatelessWidget {
             ),
           ),
         ),
+        DataCell(
+          SizedBox(
+            width: nexoSpotUrl == null ? 40 : 80,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  key: ValueKey('rebalance-copy-${line.asset.symbol}'),
+                  tooltip: 'コピー',
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 18,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 40,
+                    height: 40,
+                  ),
+                  onPressed: copyText == null
+                      ? null
+                      : () => _copyRebalanceValue(context, copyText),
+                  icon: const Icon(Icons.copy),
+                ),
+                if (nexoSpotUrl != null)
+                  IconButton(
+                    key: ValueKey('rebalance-nexo-${line.asset.symbol}'),
+                    tooltip: 'Nexoで取引',
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 18,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 40,
+                      height: 40,
+                    ),
+                    onPressed: () => _openNexoSpot(context, nexoSpotUrl),
+                    icon: const Icon(Icons.open_in_new),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  Future<void> _copyRebalanceValue(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$text をコピーしました')),
+    );
+  }
+
+  Future<void> _openNexoSpot(BuildContext context, String url) async {
+    final opened = await openExternalLink(url);
+    if (opened || !context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ページを開けませんでした')),
     );
   }
 }
@@ -821,7 +866,7 @@ class _TargetAllocationCard extends StatelessWidget {
     if (data.rates == null) {
       return 'BTC 70.0〜75.0% / HYPE 10.0〜15.0% / USDT+NEXO 15.0%\n'
           'HYPE はレート連動（50以下=15.0%、100以上=10.0%、0.1%刻み）。減った分は BTC へ。\n'
-          'NEXO は NX 総資産の 11%';
+          'NEXO は NX 総資産の 11.5%';
     }
     final hypeWeight = TargetAllocation.hypeWeight(
       data.rates!.priceOf(CryptoAsset.hype),
@@ -830,7 +875,7 @@ class _TargetAllocationCard extends StatelessWidget {
     return 'BTC ${Formatters.percent(btcWeight)} / '
         'HYPE ${Formatters.percent(hypeWeight)} / USDT+NEXO 15.0%\n'
         'HYPE はレート連動（50以下=15.0%、100以上=10.0%、0.1%刻み）。減った分は BTC へ。\n'
-        'NEXO は NX 総資産の 11%';
+        'NEXO は NX 総資産の 11.5%';
   }
 }
 

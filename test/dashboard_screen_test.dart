@@ -11,6 +11,7 @@ import 'package:cryptrebalance/data/repositories/rate_repository.dart';
 import 'package:cryptrebalance/data/repositories/rebalance_profit_repository.dart';
 import 'package:cryptrebalance/features/dashboard/view/dashboard_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -162,6 +163,10 @@ void main() {
     expect(find.textContaining('不足（購入）'), findsWidgets);
     expect(find.textContaining('過剰（売却）'), findsOneWidget);
     expect(find.text('NX'), findsOneWidget);
+    expect(find.byKey(const ValueKey('rebalance-nexo-BTC')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rebalance-nexo-HYPE')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rebalance-nexo-NEXO')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rebalance-nexo-USDT')), findsNothing);
 
     await tester.tap(find.text('更新'));
     await tester.pumpAndSettle();
@@ -179,5 +184,159 @@ void main() {
     expect(Formatters.pairRate(0.0005), '0.0005');
     expect(Formatters.percent(0.021, signed: true), '+2.1%');
     expect(Formatters.percent(-0.05, signed: true), '-5.0%');
+    expect(
+      Formatters.rebalanceClipboardText(
+        asset: CryptoAsset.btc,
+        diffAmount: -0.3,
+        diffUsdt: -30000,
+      ),
+      '0.3',
+    );
+    expect(
+      Formatters.rebalanceClipboardText(
+        asset: CryptoAsset.hype,
+        diffAmount: 300,
+        diffUsdt: 15000,
+      ),
+      '15,000',
+    );
+    expect(
+      Formatters.rebalanceClipboardText(
+        asset: CryptoAsset.hype,
+        diffAmount: -12.349,
+        diffUsdt: -600,
+      ),
+      '12.34',
+    );
+    expect(
+      Formatters.rebalanceClipboardText(
+        asset: CryptoAsset.nexo,
+        diffAmount: -11.9,
+        diffUsdt: -11.9,
+      ),
+      '11',
+    );
+    expect(
+      Formatters.rebalanceClipboardText(
+        asset: CryptoAsset.usdt,
+        diffAmount: -100.9,
+        diffUsdt: -100.9,
+      ),
+      '100',
+    );
+    expect(
+      Formatters.rebalanceClipboardText(
+        asset: CryptoAsset.btc,
+        diffAmount: -0.12345678,
+        diffUsdt: -12345.678,
+      ),
+      '0.12345678',
+    );
+    expect(
+      Formatters.rebalanceClipboardText(
+        asset: CryptoAsset.usdt,
+        diffAmount: 0,
+        diffUsdt: 0,
+      ),
+      isNull,
+    );
+  });
+
+  test('maps Nexo spot URLs except USDT', () {
+    expect(
+      CryptoAsset.btc.nexoSpotUrl,
+      'https://platform.nexo.com/spot?pair=BTC_USDT',
+    );
+    expect(
+      CryptoAsset.hype.nexoSpotUrl,
+      'https://platform.nexo.com/spot?pair=HYPE_USDT',
+    );
+    expect(
+      CryptoAsset.nexo.nexoSpotUrl,
+      'https://platform.nexo.com/spot?pair=NEXO_USDT',
+    );
+    expect(CryptoAsset.usdt.nexoSpotUrl, isNull);
+  });
+
+  testWidgets('copies unsigned sell amount and buy USDT from rebalance diffs', (
+    tester,
+  ) async {
+    final rates = MarketRates(
+      fetchedAt: DateTime(2026, 8, 20, 11, 2, 3),
+      pricesUsdt: const {
+        CryptoAsset.btc: 100000,
+        CryptoAsset.hype: 50,
+        CryptoAsset.nexo: 1,
+        CryptoAsset.usdt: 1,
+      },
+    );
+    final holdings = [
+      HoldingRecord(
+        id: 1,
+        recordedAt: DateTime(2026, 8, 20, 10, 0, 0),
+        location: StorageLocation.nx,
+        amounts: const {
+          CryptoAsset.btc: 1,
+          CryptoAsset.hype: 0,
+          CryptoAsset.nexo: 0,
+          CryptoAsset.usdt: 0,
+        },
+      ),
+    ];
+
+    tester.view.physicalSize = const Size(800, 2800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.reset();
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          holdingRepositoryProvider.overrideWithValue(
+            _MemoryHoldingRepository(holdings),
+          ),
+          rateRepositoryProvider.overrideWithValue(_FakeRateRepository(rates)),
+          dailySnapshotRepositoryProvider.overrideWithValue(
+            _FakeDailySnapshotRepository(),
+          ),
+          rebalanceProfitRepositoryProvider.overrideWithValue(
+            _FakeRebalanceProfitRepository(),
+          ),
+        ],
+        child: const MaterialApp(home: DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    String? clipboardText;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (methodCall) async {
+        if (methodCall.method == 'Clipboard.setData') {
+          clipboardText = (methodCall.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+
+    await tester.tap(find.byKey(const ValueKey('rebalance-copy-BTC')));
+    await tester.pump();
+    expect(clipboardText, '0.3');
+    expect(find.text('0.3 をコピーしました'), findsOneWidget);
+
+    ScaffoldMessenger.of(
+      tester.element(find.byType(DashboardScreen)),
+    ).clearSnackBars();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('rebalance-copy-HYPE')));
+    await tester.pump();
+    expect(clipboardText, '15,000');
+    expect(find.text('15,000 をコピーしました'), findsOneWidget);
   });
 }

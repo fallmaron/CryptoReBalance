@@ -70,4 +70,55 @@ abstract final class Formatters {
     }
     return value.isNegative ? '-$text' : text;
   }
+
+  /// 過剰（売却）は数量、不足（購入）は USDT 換算。符号なし絶対値。
+  /// コピー時は切り捨て: BTCは丸めなし、HYPEは小数2桁、NEXO/USDTは整数。
+  static String? rebalanceClipboardText({
+    required CryptoAsset asset,
+    required double diffAmount,
+    required double diffUsdt,
+  }) {
+    if (diffAmount < 0) {
+      return clipboardQuantity(asset, diffAmount.abs());
+    }
+    if (diffAmount > 0) {
+      return clipboardQuantity(CryptoAsset.usdt, diffUsdt.abs());
+    }
+    return null;
+  }
+
+  static String clipboardQuantity(CryptoAsset asset, double value) {
+    final abs = value.abs();
+    return switch (asset) {
+      CryptoAsset.btc => amount(asset, abs),
+      CryptoAsset.hype => _truncateTowardZero(abs, 2),
+      CryptoAsset.nexo => _truncateTowardZero(abs, 0),
+      CryptoAsset.usdt => NumberFormat('#,##0', 'en_US').format(
+        int.parse(_truncateTowardZero(abs, 0)),
+      ),
+    };
+  }
+
+  static String _truncateTowardZero(double value, int fractionDigits) {
+    var text = value.abs().toString();
+    if (text.contains('e') || text.contains('E')) {
+      text = value.abs().toStringAsFixed(16);
+    }
+    final dot = text.indexOf('.');
+    if (dot == -1) {
+      return text;
+    }
+    if (fractionDigits == 0) {
+      final whole = text.substring(0, dot);
+      return whole.isEmpty ? '0' : whole;
+    }
+    final end = (dot + 1 + fractionDigits).clamp(0, text.length);
+    var truncated = text.substring(0, end);
+    truncated = truncated.replaceFirst(RegExp(r'0+$'), '');
+    truncated = truncated.replaceFirst(RegExp(r'\.$'), '');
+    if (truncated.isEmpty) {
+      return '0';
+    }
+    return truncated;
+  }
 }

@@ -221,7 +221,10 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
             Wrap(
               spacing: 8,
               children: [
-                for (final kind in HoldingEntryKind.values)
+                for (final kind in [
+                  HoldingEntryKind.rebalance,
+                  HoldingEntryKind.locationMove,
+                ])
                   ChoiceChip(
                     label: Text(kind.label),
                     selected: _kind == kind,

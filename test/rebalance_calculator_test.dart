@@ -14,7 +14,7 @@ void main() {
     },
   );
 
-  test('uses USDT+NEXO as 15% and NEXO as 11% of NX total', () {
+  test('uses USDT+NEXO as 15% and NEXO as 11.5% of NX total', () {
     final snapshot = RebalanceCalculator.calculate(
       holdings: const {
         CryptoAsset.btc: 1,
@@ -35,7 +35,7 @@ void main() {
     expect(snapshot.totalBtc, 1);
     expect(snapshot.nxTotalUsdt, 100000);
     expect(snapshot.usdtNexoTargetWeight, 0.15);
-    expect(snapshot.nexoShareOfNxTarget, 0.11);
+    expect(snapshot.nexoShareOfNxTarget, 0.115);
 
     final btc = snapshot.lineOf(CryptoAsset.btc);
     expect(btc.targetUsdt, 70000);
@@ -50,13 +50,13 @@ void main() {
     expect(hype.needsBuy, isTrue);
 
     final nexo = snapshot.lineOf(CryptoAsset.nexo);
-    expect(nexo.targetUsdt, 11000);
-    expect(nexo.targetAmount, 11000);
+    expect(nexo.targetUsdt, 11500);
+    expect(nexo.targetAmount, 11500);
     expect(nexo.needsBuy, isTrue);
 
     final usdt = snapshot.lineOf(CryptoAsset.usdt);
-    expect(usdt.targetUsdt, 4000);
-    expect(usdt.targetAmount, 4000);
+    expect(usdt.targetUsdt, 3500);
+    expect(usdt.targetAmount, 3500);
     expect(usdt.needsBuy, isTrue);
   });
 
@@ -75,8 +75,8 @@ void main() {
     );
 
     expect(snapshot.nxTotalUsdt, 50000);
-    expect(snapshot.lineOf(CryptoAsset.nexo).targetUsdt, 5500);
-    expect(snapshot.lineOf(CryptoAsset.usdt).targetUsdt, 9500);
+    expect(snapshot.lineOf(CryptoAsset.nexo).targetUsdt, 5750);
+    expect(snapshot.lineOf(CryptoAsset.usdt).targetUsdt, 9250);
   });
 
   test('moves HYPE cut from 15% onto BTC when HYPE rate is 100', () {
