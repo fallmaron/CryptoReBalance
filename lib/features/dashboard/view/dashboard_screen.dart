@@ -66,13 +66,15 @@ class _DashboardBody extends StatelessWidget {
         ],
         _TotalAssetCard(data: data),
         const SizedBox(height: 12),
-        const _RebalanceProfitCard(),
-        const SizedBox(height: 12),
         _RatesCard(data: data),
         const SizedBox(height: 12),
-        _AllocationCard(data: data),
+        _LiveRebalanceProfitCard(data: data),
         const SizedBox(height: 12),
         _RebalanceCard(data: data),
+        const SizedBox(height: 12),
+        const _RebalanceProfitCard(),
+        const SizedBox(height: 12),
+        _AllocationCard(data: data),
         const SizedBox(height: 12),
         _LocationHoldingsCard(data: data),
         const SizedBox(height: 12),
@@ -118,6 +120,72 @@ class _TotalAssetCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiveRebalanceProfitCard extends StatelessWidget {
+  const _LiveRebalanceProfitCard({required this.data});
+
+  final DashboardData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'リバランスした場合の収益',
+      child: data.rates == null
+          ? const Text(
+              'レート取得後に表示します',
+              style: TextStyle(color: AppColors.textSecondary),
+            )
+            : data.liveProfits.isEmpty
+          ? const Text(
+              '前回のリバランスがあると、いま登録した場合の収益を表示します',
+              style: TextStyle(color: AppColors.textSecondary),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${Formatters.usdt(data.liveProfitTotal, signed: true)} USDT',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: data.liveProfitTotal >= 0
+                        ? AppColors.buy
+                        : AppColors.sell,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final profit in data.liveProfits)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 40,
+                          child: Text(
+                            profit.location.code,
+                            style: const TextStyle(
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${Formatters.usdt(profit.profitUsdt, signed: true)} USDT',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: profit.profitUsdt >= 0
+                                ? AppColors.buy
+                                : AppColors.sell,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
     );
   }
 }
@@ -234,30 +302,94 @@ class _RatesCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    for (final asset in [
-                      CryptoAsset.btc,
-                      CryptoAsset.hype,
-                      CryptoAsset.nexo,
-                    ])
-                      Expanded(
-                        child: _RateTile(
-                          label: asset.symbol,
-                          color: AppColors.forAsset(asset),
-                          value: Formatters.usdt(data.rates!.priceOf(asset)),
+                    Expanded(
+                      child: _RateTile(
+                        label: 'BTC',
+                        color: AppColors.btc,
+                        value: Formatters.usdt(
+                          data.rates!.priceOf(CryptoAsset.btc),
                         ),
+                        change: _changeText(data, CryptoAsset.btc),
                       ),
+                    ),
+                    Expanded(
+                      child: _RateTile(
+                        label: 'HYPE/BTC',
+                        color: AppColors.hype,
+                        value: Formatters.pairRate(data.rates!.hypePerBtc),
+                        change: _pairChangeText(data),
+                      ),
+                    ),
+                    Expanded(
+                      child: _RateTile(
+                        label: 'HYPE',
+                        color: AppColors.hype,
+                        value: Formatters.usdt(
+                          data.rates!.priceOf(CryptoAsset.hype),
+                        ),
+                        change: _changeText(data, CryptoAsset.hype),
+                      ),
+                    ),
+                    Expanded(
+                      child: _RateTile(
+                        label: 'NEXO',
+                        color: AppColors.nexo,
+                        value: Formatters.usdt(
+                          data.rates!.priceOf(CryptoAsset.nexo),
+                        ),
+                        change: _changeText(data, CryptoAsset.nexo),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-                _RateTile(
-                  label: 'HYPE/BTC',
-                  color: AppColors.hype,
-                  value: Formatters.pairRate(data.rates!.hypePerBtc),
-                ),
+                if (data.lastRebalanceAt != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    data.rateChanges == null
+                        ? '前回リバランス時点のレートがないため、変化率は表示できません'
+                        : '前回リバランス後の変化  ${Formatters.dateTimeText(data.lastRebalanceAt!)}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ],
             ),
+    );
+  }
+
+  static String? _changeText(DashboardData data, CryptoAsset asset) {
+    final changes = data.rateChanges;
+    if (changes == null) {
+      return null;
+    }
+    return Formatters.percent(changes[asset] ?? 0, signed: true);
+  }
+
+  static String? _pairChangeText(DashboardData data) {
+    final changes = data.rateChanges;
+    final rates = data.rates;
+    if (changes == null || rates == null) {
+      return null;
+    }
+    final btcChange = changes[CryptoAsset.btc] ?? 0;
+    final hypeChange = changes[CryptoAsset.hype] ?? 0;
+    if (btcChange <= -1) {
+      return null;
+    }
+    final thenBtc = rates.priceOf(CryptoAsset.btc) / (1 + btcChange);
+    final thenHype = rates.priceOf(CryptoAsset.hype) / (1 + hypeChange);
+    if (thenBtc == 0) {
+      return null;
+    }
+    final thenPair = thenHype / thenBtc;
+    if (thenPair == 0) {
+      return null;
+    }
+    return Formatters.percent(
+      (rates.hypePerBtc - thenPair) / thenPair,
+      signed: true,
     );
   }
 }
@@ -267,25 +399,51 @@ class _RateTile extends StatelessWidget {
     required this.label,
     required this.color,
     required this.value,
+    this.change,
   });
 
   final String label;
   final Color color;
   final String value;
+  final String? change;
 
   @override
   Widget build(BuildContext context) {
+    final changeColor = change == null
+        ? AppColors.textSecondary
+        : change!.startsWith('+')
+        ? AppColors.buy
+        : change!.startsWith('-')
+        ? AppColors.sell
+        : AppColors.textSecondary;
     return Column(
       children: [
         Text(
           label,
-          style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
         ),
+        if (change != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            change!,
+            style: TextStyle(
+              color: changeColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ],
     );
   }

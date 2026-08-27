@@ -6,6 +6,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../data/models/crypto_asset.dart';
 import '../../../data/models/holding_entry_kind.dart';
 import '../../../data/models/holding_record.dart';
+import '../../../data/models/market_rates.dart';
 import '../../../data/models/storage_location.dart';
 import '../../../data/repositories/holding_repository.dart';
 import '../../../data/repositories/rate_repository.dart';
@@ -141,6 +142,14 @@ class _RegisterHoldingScreenState extends ConsumerState<RegisterHoldingScreen> {
     }
 
     final rates = await ref.read(rateRepositoryProvider).getCached();
+    if (rates != null) {
+      await ref.read(rateRepositoryProvider).saveSnapshot(
+            MarketRates(
+              fetchedAt: saved.recordedAt,
+              pricesUsdt: rates.pricesUsdt,
+            ),
+          );
+    }
     if (rates == null) {
       return '${_location.code} をリバランスとして登録しました。レート未取得のため収益は記録していません';
     }

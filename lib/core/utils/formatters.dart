@@ -50,8 +50,15 @@ abstract final class Formatters {
     return text;
   }
 
-  static String percent(double value) {
-    return '${(value * 100).toStringAsFixed(1)}%';
+  static String percent(double value, {bool signed = false}) {
+    final text = '${(value.abs() * 100).toStringAsFixed(1)}%';
+    if (signed && value > 0) {
+      return '+$text';
+    }
+    if (value < 0) {
+      return '-$text';
+    }
+    return text;
   }
 
   static String pairRate(double value) {

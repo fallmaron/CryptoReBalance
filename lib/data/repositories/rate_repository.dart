@@ -6,6 +6,8 @@ import '../services/coinmarketcap_client.dart';
 
 abstract class RateRepository {
   Future<MarketRates?> getCached();
+  Future<MarketRates?> getAtOrBefore(DateTime time);
+  Future<void> saveSnapshot(MarketRates rates);
   Future<MarketRates> refresh();
 }
 
@@ -20,6 +22,14 @@ class CoinMarketCapRateRepository implements RateRepository {
 
   @override
   Future<MarketRates?> getCached() => database.getLatestRates();
+
+  @override
+  Future<MarketRates?> getAtOrBefore(DateTime time) {
+    return database.getRatesAtOrBefore(time);
+  }
+
+  @override
+  Future<void> saveSnapshot(MarketRates rates) => database.saveRates(rates);
 
   @override
   Future<MarketRates> refresh() async {

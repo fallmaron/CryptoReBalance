@@ -277,4 +277,34 @@ void main() {
     expect(leProfit.profitUsdt, 8000);
     expect(leProfit.location, StorageLocation.le);
   });
+
+  test('previews current rebalance profit per location', () {
+    final records = [
+      record(
+        id: 1,
+        at: DateTime(2026, 7, 1),
+        location: StorageLocation.nx,
+        kind: HoldingEntryKind.locationMove,
+        btc: 1,
+      ),
+      record(
+        id: 2,
+        at: DateTime(2026, 7, 10),
+        location: StorageLocation.nx,
+        kind: HoldingEntryKind.rebalance,
+        btc: 0.7,
+        usdt: 30000,
+      ),
+    ];
+
+    final previews = RebalanceProfitCalculator.previewNow(
+      records: records,
+      rates: ratesNow,
+      now: now,
+    );
+
+    expect(previews, hasLength(1));
+    expect(previews.single.location, StorageLocation.nx);
+    expect(previews.single.profitUsdt, -30000);
+  });
 }

@@ -169,15 +169,12 @@ class AppDatabase {
 
   Future<void> saveRates(MarketRates rates) async {
     final db = await database;
-    await db.transaction((txn) async {
-      await txn.delete('rate_snapshots');
-      await txn.insert('rate_snapshots', {
-        'fetched_at': rates.fetchedAt.millisecondsSinceEpoch,
-        'btc': rates.priceOf(CryptoAsset.btc),
-        'hype': rates.priceOf(CryptoAsset.hype),
-        'nexo': rates.priceOf(CryptoAsset.nexo),
-        'usdt': rates.priceOf(CryptoAsset.usdt),
-      });
+    await db.insert('rate_snapshots', {
+      'fetched_at': rates.fetchedAt.millisecondsSinceEpoch,
+      'btc': rates.priceOf(CryptoAsset.btc),
+      'hype': rates.priceOf(CryptoAsset.hype),
+      'nexo': rates.priceOf(CryptoAsset.nexo),
+      'usdt': rates.priceOf(CryptoAsset.usdt),
     });
   }
 
@@ -191,7 +188,25 @@ class AppDatabase {
     if (rows.isEmpty) {
       return null;
     }
-    final row = rows.first;
+    return _ratesFromRow(rows.first);
+  }
+
+  Future<MarketRates?> getRatesAtOrBefore(DateTime time) async {
+    final db = await database;
+    final rows = await db.query(
+      'rate_snapshots',
+      where: 'fetched_at <= ?',
+      whereArgs: [time.millisecondsSinceEpoch],
+      orderBy: 'fetched_at DESC, id DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    return _ratesFromRow(rows.first);
+  }
+
+  MarketRates? _ratesFromRow(Map<String, Object?> row) {
     final prices = {
       CryptoAsset.btc: _asDouble(row['btc']),
       CryptoAsset.hype: _asDouble(row['hype']),

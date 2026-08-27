@@ -75,6 +75,12 @@ class _FakeRateRepository implements RateRepository {
   }
 
   @override
+  Future<MarketRates?> getAtOrBefore(DateTime time) async => getCached();
+
+  @override
+  Future<void> saveSnapshot(MarketRates rates) async {}
+
+  @override
   Future<MarketRates> refresh() async {
     throw UnsupportedError('unused');
   }

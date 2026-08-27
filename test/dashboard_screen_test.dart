@@ -79,6 +79,18 @@ class _FakeRateRepository implements RateRepository {
   Future<MarketRates?> getCached() async => _rates;
 
   @override
+  Future<MarketRates?> getAtOrBefore(DateTime time) async {
+    if (_rates.fetchedAt.millisecondsSinceEpoch <=
+        time.millisecondsSinceEpoch) {
+      return _rates;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> saveSnapshot(MarketRates rates) async {}
+
+  @override
   Future<MarketRates> refresh() async {
     refreshCount += 1;
     return _rates;
@@ -113,7 +125,7 @@ void main() {
     ];
     final rateRepository = _FakeRateRepository(rates);
 
-    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.physicalSize = const Size(800, 2800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -136,7 +148,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('更新'), findsOneWidget);
+    expect(find.text('リバランスした場合の収益'), findsOneWidget);
     expect(find.text('リバランス収益'), findsOneWidget);
     expect(find.text('100,000.00 USDT'), findsOneWidget);
     expect(find.text('1 BTC'), findsOneWidget);
@@ -165,5 +177,7 @@ void main() {
     );
     expect(Formatters.amount(CryptoAsset.btc, 0.70000000), '0.7');
     expect(Formatters.pairRate(0.0005), '0.0005');
+    expect(Formatters.percent(0.021, signed: true), '+2.1%');
+    expect(Formatters.percent(-0.05, signed: true), '-5.0%');
   });
 }
