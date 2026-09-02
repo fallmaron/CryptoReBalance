@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/chart_range.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/crypto_asset.dart';
 import '../../../data/models/daily_snapshot.dart';
@@ -56,19 +58,30 @@ class DailySnapshotScreen extends ConsumerWidget {
             );
           }
           final todayKey = DailySnapshot.dayKeyOf(DateTime.now());
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            itemCount: snapshots.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final snapshot = snapshots[index];
-              return _DailySnapshotCard(
-                snapshot: snapshot,
-                onDeleteToday: snapshot.dayKey == todayKey
-                    ? () => _deleteToday(context, ref)
-                    : null,
-              );
-            },
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: _BtcHistoryChart(snapshots: snapshots),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                  itemCount: snapshots.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final snapshot = snapshots[index];
+                    return _DailySnapshotCard(
+                      snapshot: snapshot,
+                      onDeleteToday: snapshot.dayKey == todayKey
+                          ? () => _deleteToday(context, ref)
+                          : null,
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -140,6 +153,204 @@ class DailySnapshotScreen extends ConsumerWidget {
         content: Text(deleted ? '当日の記録を削除しました' : '当日の記録はありません'),
       ),
     );
+  }
+}
+
+class _BtcHistoryChart extends StatelessWidget {
+  const _BtcHistoryChart({required this.snapshots});
+
+  final List<DailySnapshot> snapshots;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = DailySnapshot.chronological(snapshots);
+    final values = [for (final item in points) item.totalBtc];
+    final range = ChartYRange.fromValues(values);
+    final lastIndex = points.length - 1;
+    final xInterval = points.length <= 5
+        ? 1.0
+        : (points.length / 4).ceilToDouble();
+    final baseline = points.first.totalBtc;
+    final lineColors = [
+      for (final point in points) _colorVsOldest(point.totalBtc, baseline),
+    ];
+    if (lineColors.length == 1) {
+      lineColors.add(lineColors.first);
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'BTC換算の推移',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 180,
+              child: LineChart(
+                LineChartData(
+                  minX: lastIndex == 0 ? -0.5 : 0,
+                  maxX: lastIndex == 0 ? 0.5 : lastIndex.toDouble(),
+                  minY: range.min,
+                  maxY: range.max,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: range.interval,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: AppColors.border,
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: const Border(
+                      left: BorderSide(color: AppColors.border),
+                      bottom: BorderSide(color: AppColors.border),
+                    ),
+                  ),
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: [
+                      HorizontalLine(
+                        y: baseline,
+                        color: AppColors.textSecondary,
+                        strokeWidth: 1,
+                        dashArray: const [6, 4],
+                      ),
+                    ],
+                  ),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 56,
+                        interval: range.interval,
+                        getTitlesWidget: (value, meta) {
+                          return SideTitleWidget(
+                            meta: meta,
+                            child: Text(
+                              value.toStringAsFixed(4),
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 10,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 22,
+                        interval: xInterval,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.round();
+                          if (index < 0 || index >= points.length) {
+                            return const SizedBox.shrink();
+                          }
+                          if ((value - index).abs() > 0.01) {
+                            return const SizedBox.shrink();
+                          }
+                          final parts = points[index].dayKey.split('-');
+                          final label = parts.length == 3
+                              ? '${parts[1]}/${parts[2]}'
+                              : points[index].dayKey;
+                          return SideTitleWidget(
+                            meta: meta,
+                            child: Text(
+                              label,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 10,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => AppColors.surface,
+                      getTooltipItems: (touched) {
+                        return [
+                          for (final spot in touched)
+                            LineTooltipItem(
+                              '${_tooltipDate(points, spot.x)}\n${Formatters.amount(CryptoAsset.btc, spot.y)} BTC',
+                              TextStyle(
+                                color: _colorVsOldest(spot.y, baseline),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ];
+                      },
+                    ),
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: [
+                        for (var i = 0; i < points.length; i++)
+                          FlSpot(i.toDouble(), points[i].totalBtc),
+                      ],
+                      isCurved: false,
+                      gradient: LinearGradient(colors: lineColors),
+                      barWidth: 2.5,
+                      dotData: FlDotData(
+                        getDotPainter: (spot, percent, bar, index) {
+                          return FlDotCirclePainter(
+                            radius: 3.5,
+                            color: _colorVsOldest(spot.y, baseline),
+                            strokeWidth: 0,
+                          );
+                        },
+                      ),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: AppColors.buy.withValues(alpha: 0.18),
+                        cutOffY: baseline,
+                        applyCutOffY: true,
+                      ),
+                      aboveBarData: BarAreaData(
+                        show: true,
+                        color: AppColors.sell.withValues(alpha: 0.18),
+                        cutOffY: baseline,
+                        applyCutOffY: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Color _colorVsOldest(double value, double baseline) {
+    if (value > baseline) {
+      return AppColors.buy;
+    }
+    if (value < baseline) {
+      return AppColors.sell;
+    }
+    return AppColors.textSecondary;
+  }
+
+  static String _tooltipDate(List<DailySnapshot> points, double x) {
+    final index = x.round().clamp(0, points.length - 1);
+    return points[index].dayKey.replaceAll('-', '/');
   }
 }
 

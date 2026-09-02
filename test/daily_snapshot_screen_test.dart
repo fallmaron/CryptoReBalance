@@ -74,6 +74,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('当日分を削除'), findsOneWidget);
+    expect(find.text('BTC換算の推移'), findsOneWidget);
     expect(find.text(today.dayKey.replaceAll('-', '/')), findsOneWidget);
     expect(find.text(yesterday.dayKey.replaceAll('-', '/')), findsOneWidget);
 

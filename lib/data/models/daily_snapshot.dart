@@ -88,4 +88,16 @@ class DailySnapshot {
       return left.recordedAt.isBefore(right.recordedAt) ? left : right;
     });
   }
+
+  static List<DailySnapshot> chronological(List<DailySnapshot> snapshots) {
+    final copy = [...snapshots];
+    copy.sort((left, right) {
+      final byDay = left.dayKey.compareTo(right.dayKey);
+      if (byDay != 0) {
+        return byDay;
+      }
+      return left.recordedAt.compareTo(right.recordedAt);
+    });
+    return copy;
+  }
 }
