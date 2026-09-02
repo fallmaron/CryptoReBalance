@@ -61,6 +61,15 @@ abstract final class Formatters {
     return text;
   }
 
+  static String btcProfitLine({
+    required double profitBtc,
+    required double btcPriceUsdt,
+  }) {
+    final profitUsdt = (profitBtc * btcPriceUsdt).abs();
+    final usdtText = _truncateTowardZero(profitUsdt, 0);
+    return '${amount(CryptoAsset.btc, profitBtc, signed: true)}BTC(${usdtText}USDT)';
+  }
+
   static String pairRate(double value) {
     var text = value.abs().toStringAsFixed(8);
     text = text.replaceFirst(RegExp(r'0+$'), '');

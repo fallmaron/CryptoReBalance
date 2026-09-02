@@ -60,8 +60,12 @@ class _FakeRebalanceProfitRepository implements RebalanceProfitRepository {
 }
 
 class _FakeDailySnapshotRepository implements DailySnapshotRepository {
+  _FakeDailySnapshotRepository([this._snapshots = const []]);
+
+  final List<DailySnapshot> _snapshots;
+
   @override
-  Future<List<DailySnapshot>> getAll() async => [];
+  Future<List<DailySnapshot>> getAll() async => List.of(_snapshots);
 
   @override
   Future<bool> saveIfAbsent(DailySnapshot snapshot) async => true;
@@ -181,6 +185,33 @@ void main() {
       '2026/08/20 11:02:03',
     );
     expect(Formatters.amount(CryptoAsset.btc, 0.70000000), '0.7');
+    expect(
+      Formatters.btcProfitLine(profitBtc: 0.01, btcPriceUsdt: 77000.9),
+      '+0.01BTC(770USDT)',
+    );
+    expect(
+      Formatters.btcProfitLine(profitBtc: -0.01, btcPriceUsdt: 77000.9),
+      '-0.01BTC(770USDT)',
+    );
+    expect(
+      DailySnapshot.oldestOf([
+        DailySnapshot(
+          dayKey: '2026-08-20',
+          recordedAt: DateTime(2026, 8, 20),
+          totalUsdt: 100000,
+          totalBtc: 1,
+          assets: const {},
+        ),
+        DailySnapshot(
+          dayKey: '2026-08-01',
+          recordedAt: DateTime(2026, 8, 1),
+          totalUsdt: 99000,
+          totalBtc: 0.99,
+          assets: const {},
+        ),
+      ])?.totalBtc,
+      0.99,
+    );
     expect(Formatters.pairRate(0.0005), '0.0005');
     expect(Formatters.percent(0.021, signed: true), '+2.1%');
     expect(Formatters.percent(-0.05, signed: true), '-5.0%');
@@ -338,5 +369,73 @@ void main() {
     await tester.pump();
     expect(clipboardText, '15,000');
     expect(find.text('15,000 をコピーしました'), findsOneWidget);
+  });
+
+  testWidgets('shows BTC profit against the oldest daily snapshot', (
+    tester,
+  ) async {
+    final rates = MarketRates(
+      fetchedAt: DateTime(2026, 8, 20, 11, 2, 3),
+      pricesUsdt: const {
+        CryptoAsset.btc: 100000,
+        CryptoAsset.hype: 50,
+        CryptoAsset.nexo: 1,
+        CryptoAsset.usdt: 1,
+      },
+    );
+    final holdings = [
+      HoldingRecord(
+        id: 1,
+        recordedAt: DateTime(2026, 8, 20, 10, 0, 0),
+        location: StorageLocation.nx,
+        amounts: const {
+          CryptoAsset.btc: 1,
+          CryptoAsset.hype: 0,
+          CryptoAsset.nexo: 0,
+          CryptoAsset.usdt: 0,
+        },
+      ),
+    ];
+
+    tester.view.physicalSize = const Size(800, 2800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          holdingRepositoryProvider.overrideWithValue(
+            _MemoryHoldingRepository(holdings),
+          ),
+          rateRepositoryProvider.overrideWithValue(_FakeRateRepository(rates)),
+          dailySnapshotRepositoryProvider.overrideWithValue(
+            _FakeDailySnapshotRepository([
+              DailySnapshot(
+                dayKey: '2026-08-20',
+                recordedAt: DateTime(2026, 8, 20),
+                totalUsdt: 100000,
+                totalBtc: 1,
+                assets: const {},
+              ),
+              DailySnapshot(
+                dayKey: '2026-08-01',
+                recordedAt: DateTime(2026, 8, 1),
+                totalUsdt: 99000,
+                totalBtc: 0.99,
+                assets: const {},
+              ),
+            ]),
+          ),
+          rebalanceProfitRepositoryProvider.overrideWithValue(
+            _FakeRebalanceProfitRepository(),
+          ),
+        ],
+        child: const MaterialApp(home: DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 BTC'), findsOneWidget);
+    expect(find.text('+0.01BTC(1000USDT)'), findsOneWidget);
   });
 }

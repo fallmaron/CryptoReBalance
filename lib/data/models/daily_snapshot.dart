@@ -75,4 +75,17 @@ class DailySnapshot {
     final day = local.day.toString().padLeft(2, '0');
     return '$year-$month-$day';
   }
+
+  static DailySnapshot? oldestOf(List<DailySnapshot> snapshots) {
+    if (snapshots.isEmpty) {
+      return null;
+    }
+    return snapshots.reduce((left, right) {
+      final byDay = left.dayKey.compareTo(right.dayKey);
+      if (byDay != 0) {
+        return byDay < 0 ? left : right;
+      }
+      return left.recordedAt.isBefore(right.recordedAt) ? left : right;
+    });
+  }
 }

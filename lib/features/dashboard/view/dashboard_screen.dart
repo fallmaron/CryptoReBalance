@@ -10,7 +10,9 @@ import '../../../data/models/crypto_asset.dart';
 import '../../../data/models/holding_record.dart';
 import '../../../data/models/market_rates.dart';
 import '../../../data/models/rebalance_snapshot.dart';
+import '../../../data/models/daily_snapshot.dart';
 import '../../../data/models/storage_location.dart';
+import '../../../data/repositories/daily_snapshot_repository.dart';
 import '../../../data/services/holding_aggregator.dart';
 import '../../../data/services/target_allocation.dart';
 import '../viewmodel/dashboard_viewmodel.dart';
@@ -81,15 +83,30 @@ class _DashboardBody extends StatelessWidget {
   }
 }
 
-class _TotalAssetCard extends StatelessWidget {
+class _TotalAssetCard extends ConsumerWidget {
   const _TotalAssetCard({required this.data});
 
   final DashboardData data;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final totalUsdt = data.rebalance?.totalUsdt;
     final totalBtc = data.rebalance?.totalBtc;
+    final snapshots = ref.watch(dailySnapshotsProvider);
+    final oldest = snapshots.maybeWhen(
+      data: DailySnapshot.oldestOf,
+      orElse: () => null,
+    );
+    final profitBtc = totalBtc == null || oldest == null
+        ? null
+        : totalBtc - oldest.totalBtc;
+    final btcPrice = data.rates?.priceOf(CryptoAsset.btc);
+    final profitLine = profitBtc == null || btcPrice == null
+        ? null
+        : Formatters.btcProfitLine(
+            profitBtc: profitBtc,
+            btcPriceUsdt: btcPrice,
+          );
     return _SectionCard(
       title: '総資産',
       child: Column(
@@ -115,6 +132,17 @@ class _TotalAssetCard extends StatelessWidget {
               color: AppColors.btc,
             ),
           ),
+          if (profitLine != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              profitLine,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: profitBtc! >= 0 ? AppColors.buy : AppColors.sell,
+              ),
+            ),
+          ],
         ],
       ),
     );
