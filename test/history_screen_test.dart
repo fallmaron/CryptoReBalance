@@ -105,7 +105,7 @@ void main() {
     );
   }
 
-  testWidgets('shows rebalance profit on the matching history card', (
+  testWidgets('does not show rebalance profit on history cards', (
     tester,
   ) async {
     final records = [
@@ -143,8 +143,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('リバランス収益  -30,000.00 USDT'), findsOneWidget);
-    expect(find.text('実施 170,000.00 / 未実施 200,000.00'), findsOneWidget);
+    expect(find.textContaining('リバランス収益'), findsNothing);
+    expect(find.textContaining('実施'), findsNothing);
+    expect(find.text('NX'), findsWidgets);
   });
 
   testWidgets('deletes all history after two confirmations', (tester) async {

@@ -11,7 +11,6 @@ import '../../../data/models/holding_record.dart';
 import '../../../data/models/market_rates.dart';
 import '../../../data/models/rebalance_snapshot.dart';
 import '../../../data/models/storage_location.dart';
-import '../../../data/repositories/rebalance_profit_repository.dart';
 import '../../../data/services/holding_aggregator.dart';
 import '../../../data/services/target_allocation.dart';
 import '../viewmodel/dashboard_viewmodel.dart';
@@ -70,11 +69,7 @@ class _DashboardBody extends StatelessWidget {
         const SizedBox(height: 12),
         _RatesCard(data: data),
         const SizedBox(height: 12),
-        _LiveRebalanceProfitCard(data: data),
-        const SizedBox(height: 12),
         _RebalanceCard(data: data),
-        const SizedBox(height: 12),
-        const _RebalanceProfitCard(),
         const SizedBox(height: 12),
         _AllocationCard(data: data),
         const SizedBox(height: 12),
@@ -121,130 +116,6 @@ class _TotalAssetCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _LiveRebalanceProfitCard extends StatelessWidget {
-  const _LiveRebalanceProfitCard({required this.data});
-
-  final DashboardData data;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'リバランスした場合の収益',
-      child: data.rates == null
-          ? const Text(
-              'レート取得後に表示します',
-              style: TextStyle(color: AppColors.textSecondary),
-            )
-            : data.liveProfits.isEmpty
-          ? const Text(
-              '前回のリバランスがあると、いま登録した場合の収益を表示します',
-              style: TextStyle(color: AppColors.textSecondary),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${Formatters.usdt(data.liveProfitTotal, signed: true)} USDT',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: data.liveProfitTotal >= 0
-                        ? AppColors.buy
-                        : AppColors.sell,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (final profit in data.liveProfits)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 40,
-                          child: Text(
-                            profit.location.code,
-                            style: const TextStyle(
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '${Formatters.usdt(profit.profitUsdt, signed: true)} USDT',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: profit.profitUsdt >= 0
-                                ? AppColors.buy
-                                : AppColors.sell,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-    );
-  }
-}
-
-class _RebalanceProfitCard extends ConsumerWidget {
-  const _RebalanceProfitCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final asyncProfits = ref.watch(rebalanceProfitsProvider);
-    return _SectionCard(
-      title: 'リバランス収益',
-      child: asyncProfits.when(
-        loading: () => const LinearProgressIndicator(minHeight: 2),
-        error: (error, _) => Text(
-          error.toString(),
-          style: const TextStyle(color: AppColors.sell, fontSize: 13),
-        ),
-        data: (profits) {
-          if (profits.isEmpty) {
-            return const Text(
-              '保管場所ごとに、リバランス登録時に直近リバランスの実施有無の差を記録します',
-              style: TextStyle(color: AppColors.textSecondary),
-            );
-          }
-          final latest = profits.first;
-          final total = profits.fold<double>(
-            0,
-            (sum, item) => sum + item.profitUsdt,
-          );
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '累計  ${Formatters.usdt(total, signed: true)} USDT',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: total >= 0 ? AppColors.buy : AppColors.sell,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '直近  ${latest.location.code}  ${Formatters.usdt(latest.profitUsdt, signed: true)} USDT',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                Formatters.dateTimeText(latest.recordedAt),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          );
-        },
       ),
     );
   }

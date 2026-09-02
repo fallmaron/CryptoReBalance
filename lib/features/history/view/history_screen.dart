@@ -5,8 +5,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/crypto_asset.dart';
 import '../../../data/models/holding_record.dart';
-import '../../../data/models/rebalance_profit.dart';
-import '../../../data/repositories/rebalance_profit_repository.dart';
 import '../../dashboard/viewmodel/dashboard_viewmodel.dart';
 import '../viewmodel/history_viewmodel.dart';
 
@@ -16,7 +14,6 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncHistory = ref.watch(historyViewModelProvider);
-    final asyncProfits = ref.watch(rebalanceProfitsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -46,10 +43,6 @@ class HistoryScreen extends ConsumerWidget {
               ),
             );
           }
-          final profits = asyncProfits.maybeWhen(
-            data: (items) => items,
-            orElse: () => const <RebalanceProfit>[],
-          );
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             itemCount: records.length,
@@ -79,32 +72,13 @@ class HistoryScreen extends ConsumerWidget {
                       .read(dashboardViewModelProvider.notifier)
                       .reloadHoldings();
                 },
-                child: _HistoryCard(
-                  record: record,
-                  profit: _profitOf(record, profits),
-                ),
+                child: _HistoryCard(record: record),
               );
             },
           );
         },
       ),
     );
-  }
-
-  static RebalanceProfit? _profitOf(
-    HoldingRecord record,
-    List<RebalanceProfit> profits,
-  ) {
-    final id = record.id;
-    if (id == null) {
-      return null;
-    }
-    for (final profit in profits) {
-      if (profit.belongsTo(id)) {
-        return profit;
-      }
-    }
-    return null;
   }
 
   Future<void> _deleteAll(BuildContext context, WidgetRef ref) async {
@@ -193,13 +167,9 @@ class HistoryScreen extends ConsumerWidget {
 }
 
 class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({
-    required this.record,
-    this.profit,
-  });
+  const _HistoryCard({required this.record});
 
   final HoldingRecord record;
-  final RebalanceProfit? profit;
 
   @override
   Widget build(BuildContext context) {
@@ -281,24 +251,6 @@ class _HistoryCard extends StatelessWidget {
                   ],
                 ),
               ),
-            if (profit != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'リバランス収益  ${Formatters.usdt(profit!.profitUsdt, signed: true)} USDT',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: profit!.profitUsdt >= 0 ? AppColors.buy : AppColors.sell,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '実施 ${Formatters.usdt(profit!.withUsdt)} / 未実施 ${Formatters.usdt(profit!.withoutUsdt)}',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
           ],
         ),
       ),

@@ -149,8 +149,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('リバランスした場合の収益'), findsOneWidget);
-    expect(find.text('リバランス収益'), findsOneWidget);
+    expect(find.text('リバランスした場合の収益'), findsNothing);
+    expect(find.text('リバランス収益'), findsNothing);
     expect(find.text('100,000.00 USDT'), findsOneWidget);
     expect(find.text('1 BTC'), findsOneWidget);
     expect(find.text('HYPE/BTC'), findsOneWidget);
